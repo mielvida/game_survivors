@@ -236,58 +236,60 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  // floating-island cliff: rocky lip, layered cliff faces, glowing crystals, mist below, distant islands
+  // stone wall: rough stacked blocks with mossy patches, corner towers with torches, forest beyond
   (function buildArena() {
     var parts = [], glow = [], d = new THREE.Object3D(), i;
-    var ROCK = [0x6e6a64, 0x7c776e, 0x5f5b57, 0x85807a], STRATA = [0x5b4f45, 0x6a5b4d, 0x4e463f, 0x72655a];
-    // cliff faces below the edge, stacked in strata with a little jitter
+    var STONE = [0x77746f, 0x85827b, 0x6a6761, 0x8d8a82, 0x706c66, 0x7f7b73];
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (sd) {
-      var alongX = sd[0] === 0;
-      for (var layer = 0; layer < 7; layer++) {
-        var h = 2.2, y = -layer * 2.0 - 1.0, out = 0.4 + layer * 0.55 + rnd() * 0.5;
-        var px = alongX ? 0 : sd[0] * (B + out), pz = alongX ? sd[1] * (B + out) : 0;
-        parts.push(P(BOX, STRATA[layer % 4], px, y, pz, alongX ? 2 * B + 2 : 1.6 + layer * 0.3, h, alongX ? 1.6 + layer * 0.3 : 2 * B + 2));
+      var alongX = sd[0] === 0, hs = (alongX && sd[1] === 1) ? 0.6 : 1; // near wall kept lower so the hero stays visible
+      var edge = (alongX ? sd[1] : sd[0]) * (B + 0.55);
+      // dark mortar core hides gaps between blocks
+      parts.push(P(BOX, 0x2d2b29, alongX ? 0 : edge, 0.95 * hs, alongX ? edge : 0, alongX ? 2 * B + 4 : 1.0, 1.9 * hs, alongX ? 1.0 : 2 * B + 4));
+      for (var row = 0; row < 3; row++) {
+        var k = -B - 2 + (row % 2) * 0.8;
+        while (k < B + 2) {
+          var len = 1.2 + rnd() * 1.3, bh = (0.58 + rnd() * 0.12) * hs, depth = 1.05 + rnd() * 0.3;
+          var yc = (row * 0.64 + 0.32) * hs + (row === 2 ? rnd() * 0.12 * hs : 0), c = STONE[Math.floor(rnd() * STONE.length)];
+          var along = k + len / 2, off = edge + (rnd() - 0.5) * 0.12 * (alongX ? sd[1] : sd[0]);
+          var ry = (rnd() - 0.5) * 0.05;
+          parts.push(P(BOX, c, alongX ? along : off, yc, alongX ? off : along, alongX ? len - 0.07 : depth, bh - 0.05, alongX ? depth : len - 0.07, alongX ? ry : -ry));
+          if (row === 2 && rnd() < 0.5) parts.push(P(ICO, 0x4a8a4c, alongX ? along : off, yc + bh * 0.5, alongX ? off : along, 0.5 + rnd() * 0.4, 0.14, 0.4));
+          if (rnd() < 0.12) parts.push(P(ICO, 0x4a8a4c, alongX ? along : off + sd[1] * 0.1, yc, alongX ? off - sd[1] * depth * 0.5 : along, 0.45, 0.35, 0.12));
+          k += len;
+        }
       }
-      // rock lip: boulders along the edge, some with a mossy cap
-      for (var k = -B; k <= B; k += 1.7) {
-        var jitter = rnd() * 0.9, s1 = 0.9 + rnd() * 1.1, hh = 0.5 + rnd() * 1.0;
-        var bx = alongX ? k + rnd() : sd[0] * (B + 0.3 + jitter), bz = alongX ? sd[1] * (B + 0.3 + jitter) : k + rnd();
-        parts.push(P(ICO, ROCK[Math.floor(rnd() * 4)], bx, hh * 0.4, bz, s1, hh, s1 * (0.8 + rnd() * 0.5)));
-        if (rnd() < 0.55) parts.push(P(ICO, 0x3f7d46, bx, hh * 0.4 + hh * 0.75, bz, s1 * 0.8, hh * 0.28, s1 * 0.7));
+      // irregular capstones on the crest
+      for (var q = -B; q < B; q += 1.4 + rnd()) {
+        var cs = 0.5 + rnd() * 0.45;
+        parts.push(P(ICO, STONE[Math.floor(rnd() * STONE.length)], alongX ? q : edge, 1.95 * hs + cs * 0.1, alongX ? edge : q, cs, cs * 0.55, cs));
       }
     });
-    // hanging stalactites under the island
-    for (i = 0; i < 18; i++) {
-      var ang = rnd() * TAU, r2 = rnd() * (B - 4), sc = 2 + rnd() * 3;
-      parts.push(P(CONE, 0x4e463f, Math.cos(ang) * r2, -14 - sc * 0.5, Math.sin(ang) * r2, sc * 0.8, sc * 2.2, sc * 0.8, 0, Math.PI));
-    }
-    // corner crystals
+    // corner towers with torch flames
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (c) {
-      var cx = c[0] * (B + 0.7), cz = c[1] * (B + 0.7);
-      parts.push(P(ICO, 0x58525a, cx, 0.5, cz, 1.8, 1.0, 1.8));
-      glow.push(P(CONE, 0x7a8dff, cx, 2.0, cz, 0.55, 2.6, 0.55));
-      glow.push(P(CONE, 0xa9b8ff, cx + 0.7, 1.3, cz + 0.3, 0.3, 1.6, 0.3, 0, -0.35));
-      glow.push(P(CONE, 0x9c7cff, cx - 0.6, 1.1, cz - 0.4, 0.28, 1.4, 0.28, 0, 0.4));
+      var cx = c[0] * (B + 0.6), cz = c[1] * (B + 0.6);
+      for (var t = 0; t < 4; t++) parts.push(P(BOX, STONE[(t + 2) % STONE.length], cx, 0.45 + t * 0.62, cz, 2.3 - t * 0.12, 0.6, 2.3 - t * 0.12, t * 0.12));
+      parts.push(P(BOX, 0x4a4743, cx, 3.0, cz, 2.0, 0.3, 2.0));
+      parts.push(P(CYL, 0x3b3835, cx, 3.35, cz, 0.35, 0.45, 0.35));
+      glow.push(P(CONE, 0xffa63d, cx, 3.95, cz, 0.38, 0.9, 0.38));
+      glow.push(P(CONE, 0xffe08a, cx, 3.8, cz, 0.2, 0.55, 0.2));
     });
     scene.add(new THREE.Mesh(mergeParts(parts), vcMat));
     scene.add(new THREE.Mesh(mergeParts(glow), new THREE.MeshBasicMaterial({ vertexColors: true })));
 
-    // mist layers far below the edge
-    [-5, -9].forEach(function (y, n) {
-      var mist = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), new THREE.MeshBasicMaterial({ color: n ? 0x2a3a52 : 0x8fa6c4, transparent: true, opacity: n ? 0.85 : 0.22, depthWrite: false }));
-      mist.rotation.x = -Math.PI / 2; mist.position.y = y; scene.add(mist);
-    });
-
-    // distant floating islands with a pine on top
-    var isle = mergeParts([P(CONE, 0x5b4f45, 0, -3, 0, 5, 7, 5, 0, Math.PI), P(CYL, 0x3f7d46, 0, 0.2, 0, 5.2, 0.5, 5.2),
-      P(CYL, 0x6b4a2b, 0, 1.0, 0, 0.3, 1.4, 0.3), P(CONE, 0x28603f, 0, 2.4, 0, 1.3, 2.6, 1.3), P(CONE, 0x2f7249, 0, 3.8, 0, 0.9, 2.0, 0.9)]);
-    var isles = new THREE.InstancedMesh(isle, vcMat, 9);
-    for (i = 0; i < 9; i++) {
-      var a2 = i / 9 * TAU + rnd() * 0.5, dist = 58 + rnd() * 40, sc2 = 0.8 + rnd() * 1.4;
-      d.position.set(Math.cos(a2) * dist, -4 + rnd() * 14, Math.sin(a2) * dist); d.rotation.set(0, rnd() * TAU, 0); d.scale.set(sc2, sc2, sc2); d.updateMatrix();
-      isles.setMatrixAt(i, d.matrix);
+    // forest floor beyond the wall + trees
+    var outer = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshLambertMaterial({ color: 0x142219 }));
+    outer.rotation.x = -Math.PI / 2; outer.position.y = -0.06; scene.add(outer);
+    var tree = mergeParts([P(CYL, 0x6b4a2b, 0, 0.7, 0, 0.22, 1.4, 0.22), P(CONE, 0x1f4d37, 0, 1.9, 0, 1.2, 1.7, 1.2),
+      P(CONE, 0x28603f, 0, 2.9, 0, 0.95, 1.5, 0.95), P(CONE, 0x2f7249, 0, 3.8, 0, 0.65, 1.3, 0.65)]);
+    var NT = 130, trees = new THREE.InstancedMesh(tree, vcMat, NT);
+    for (i = 0; i < NT; i++) {
+      var side = Math.floor(rnd() * 4), off2 = B + 4 + rnd() * 26, al = (rnd() * 2 - 1) * (B + 30);
+      var tx = side < 2 ? al : (side === 2 ? -off2 : off2), tz = side < 2 ? (side === 0 ? -off2 : off2) : al;
+      var sc = 0.9 + rnd() * 1.2;
+      d.position.set(tx, 0, tz); d.rotation.set(0, rnd() * TAU, 0); d.scale.set(sc, sc * (0.9 + rnd() * 0.4), sc); d.updateMatrix();
+      trees.setMatrixAt(i, d.matrix);
     }
-    scene.add(isles);
+    scene.add(trees);
 
     // grass tufts and rocks inside the arena (decoration only, no collision)
     var tuft = mergeParts([P(CONE, 0x3f7d46, -0.1, 0.2, 0, 0.08, 0.45, 0.08, 0, 0.25), P(CONE, 0x56995a, 0.05, 0.25, 0.05, 0.08, 0.55, 0.08), P(CONE, 0x3f7d46, 0.15, 0.2, -0.03, 0.08, 0.42, 0.08, 0, -0.3)]);
