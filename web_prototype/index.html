@@ -1,0 +1,567 @@
+<title>에테르 원정대 시안</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: full-screen 3D stage with DOM HUD on top; portrait-first, touch joystick. */
+:root {
+  --bg: #0d1418;
+  --fg: #eef3f1;
+  --muted: #9fb0aa;
+  --panel: #18232a;
+  --line: #2c3d46;
+  --accent: #ffc94a;
+  --hp: #e14d4d;
+  --xp: #5cb8ff;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: "Noto Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  margin: 0; overflow: hidden; overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+#stage { position: absolute; inset: 0; touch-action: none; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+#hud { position: absolute; inset: 0; pointer-events: none; padding-top: env(safe-area-inset-top, 0px); }
+.bar { height: 10px; background: rgba(0,0,0,.55); }
+.bar > i { display: block; height: 100%; width: 0; background: var(--xp); }
+.row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); padding-top: 8px; }
+.hp { width: min(46vw, 240px); height: 14px; background: rgba(0,0,0,.55); border-radius: 7px; overflow: hidden; }
+.hp > i { display: block; height: 100%; width: 100%; background: var(--hp); }
+.info { font-size: 14px; margin-top: 6px; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
+.timer { font-size: 22px; font-weight: 700; text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
+#joyBase, #joyKnob { position: absolute; border-radius: 50%; display: none; }
+#joyBase { width: 140px; height: 140px; margin: -70px 0 0 -70px; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.3); }
+#joyKnob { width: 56px; height: 56px; margin: -28px 0 0 -28px; background: rgba(255,255,255,.5); }
+#hint { position: absolute; left: 0; right: 0; bottom: max(24px, env(safe-area-inset-bottom, 0px)); text-align: center; font-size: 14px; color: var(--muted); text-shadow: 0 1px 2px #000; transition: opacity .6s; }
+#overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: rgba(5,9,12,.78); padding: 20px max(16px, env(safe-area-inset-left, 0px)); overflow-y: auto; }
+#overlay h2 { margin: 0; font-size: clamp(22px, 6vw, 30px); text-wrap: balance; text-align: center; }
+#overlay p { margin: 0; color: var(--muted); text-align: center; line-height: 1.6; }
+.cards { display: flex; flex-direction: column; gap: 12px; width: min(100%, 460px); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.card:active { border-color: var(--accent); background: #213039; }
+.card .k { font-size: 12px; letter-spacing: .06em; color: var(--accent); }
+.card .n { font-size: 18px; font-weight: 700; margin: 2px 0; }
+.card .d { font-size: 14px; color: var(--muted); }
+.btn { background: var(--accent); color: #231a00; border: 0; border-radius: 10px; font: inherit; font-weight: 700; font-size: 17px; padding: 14px 28px; cursor: pointer; }
+#err { position: absolute; left: 16px; right: 16px; top: 80px; color: #ff9a8a; font-size: 13px; }
+</style>
+
+<div id="stage"></div>
+<div id="hud">
+  <div class="bar"><i id="xp"></i></div>
+  <div class="row">
+    <div>
+      <div class="hp"><i id="hp"></i></div>
+      <div class="info" id="info">Lv.1</div>
+    </div>
+    <div class="timer" id="timer">5:00</div>
+  </div>
+  <div id="joyBase"></div><div id="joyKnob"></div>
+  <div id="hint">화면을 누르고 드래그해서 이동 · 공격은 자동</div>
+</div>
+<div id="overlay"></div>
+<div id="err"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var errBox = document.getElementById('err');
+  window.addEventListener('error', function (e) { errBox.textContent = '오류: ' + e.message; });
+  if (!window.THREE) { errBox.textContent = '3D 라이브러리를 불러오지 못했습니다.'; return; }
+
+  // ---------- config & data (mirrors the Unity prototype) ----------
+  var CFG = { dur: 300, max: 200, spawnR: 20, pitch: 55 * Math.PI / 180, dist: 30, fov: 40, elite: 150, maxActive: 4, maxPassive: 4 };
+  var expReq = function (l) { return 4 + 3 * l + Math.floor(l * l / 2); };
+
+  var ENEMY = {
+    slime:    { hp: 18,  speed: 2.2, dmg: 6,  r: 0.4, exp: 1,  color: 0x59bf59, scale: [0.9, 0.7, 0.9], shape: 'sphere', baseY: 0.35 },
+    skeleton: { hp: 36,  speed: 2.8, dmg: 9,  r: 0.4, exp: 2,  color: 0xe0dbbf, scale: [0.6, 0.6, 0.6], shape: 'cyl',    baseY: 0.6 },
+    brute:    { hp: 600, speed: 2.0, dmg: 18, r: 0.8, exp: 25, color: 0xb33833, scale: [1.5, 1.5, 1.5], shape: 'box',    baseY: 0.75 }
+  };
+  var ETYPES = ['slime', 'skeleton', 'brute'];
+
+  var SKILLS = {
+    bolt:   { name: '마법 화살',   active: true,  txt: ['가까운 적에게 화살 1발', '피해 +20%', '화살 +1발', '관통 +1, 연사 속도 증가', '화살 +1발, 피해 증가'] },
+    orbit:  { name: '정령의 칼날', active: true,  txt: ['주변을 도는 칼날 2개', '피해 +30%', '칼날 +1개', '피해 +25%', '칼날 +1개, 피해 증가'] },
+    pulse:  { name: '신성한 파동', active: true,  txt: ['주기적으로 주변에 피해', '범위 +15%', '주기 단축', '피해 +30%', '범위와 주기 대폭 강화'] },
+    might:  { name: '힘의 문장',   active: false, txt: ['공격력 +15%', '공격력 +30%', '공격력 +45%', '공격력 +60%', '공격력 +75%'] },
+    haste:  { name: '신속의 반지', active: false, txt: ['공격 속도 +12%', '공격 속도 +24%', '공격 속도 +36%', '공격 속도 +48%', '공격 속도 +60%'] },
+    boots:  { name: '바람의 장화', active: false, txt: ['이동 속도 +0.5', '이동 속도 +1.0', '이동 속도 +1.5', '이동 속도 +2.0', '이동 속도 +2.5'] },
+    magnet: { name: '자석 구슬',   active: false, txt: ['보석 흡수 범위 +1.2', '보석 흡수 범위 +2.4', '보석 흡수 범위 +3.6', '보석 흡수 범위 +4.8', '보석 흡수 범위 +6.0'] },
+    vital:  { name: '생명의 심장', active: false, txt: ['최대 체력 +20', '최대 체력 +40', '최대 체력 +60', '최대 체력 +80', '최대 체력 +100'] },
+    heal:   { name: '회복',        active: false, txt: ['체력 30% 회복'] }
+  };
+  var SKILL_IDS = ['bolt', 'orbit', 'pulse', 'might', 'haste', 'boots', 'magnet', 'vital'];
+  var BOLT = { count: [1, 1, 2, 2, 3], cd: [1.0, 0.9, 0.9, 0.75, 0.7], dmg: [10, 12, 12, 14, 17], pierce: [1, 1, 1, 2, 3] };
+  var ORBIT = { count: [2, 2, 3, 3, 4], dmg: [6, 8, 8, 10, 12] };
+  var PULSE = { interval: [3, 3, 2.5, 2.5, 1.8], radius: [3, 3.5, 3.5, 3.5, 5], dmg: [12, 15, 18, 24, 28] };
+
+  // ---------- three.js scene ----------
+  var stage = document.getElementById('stage');
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setClearColor(0x121c20);
+  stage.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x121c20, 45, 85);
+  var camera = new THREE.PerspectiveCamera(CFG.fov, 1, 0.3, 160);
+  scene.add(new THREE.AmbientLight(0xa8b8c0, 0.85));
+  var sun = new THREE.DirectionalLight(0xfff2dc, 0.9);
+  sun.position.set(-6, 10, 5);
+  scene.add(sun);
+
+  function resize() {
+    var w = stage.clientWidth || window.innerWidth, h = stage.clientHeight || window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ground: checker texture, plane snaps to the hero in whole periods so it looks endless
+  var PLANE = 120, PERIOD = 8;
+  var gc = document.createElement('canvas'); gc.width = gc.height = 2;
+  var gx = gc.getContext('2d');
+  var cA = '#29443a', cB = '#30503f';
+  gx.fillStyle = cA; gx.fillRect(0, 0, 1, 1); gx.fillRect(1, 1, 1, 1);
+  gx.fillStyle = cB; gx.fillRect(1, 0, 1, 1); gx.fillRect(0, 1, 1, 1);
+  var gtex = new THREE.CanvasTexture(gc);
+  gtex.magFilter = THREE.NearestFilter; gtex.minFilter = THREE.NearestFilter;
+  gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
+  gtex.repeat.set(PLANE / PERIOD, PLANE / PERIOD);
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(PLANE, PLANE), new THREE.MeshLambertMaterial({ map: gtex }));
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  // hero
+  var heroGroup = new THREE.Group();
+  var heroVis = new THREE.Group();
+  function part(geo, color, x, y, z) {
+    var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: color }));
+    m.position.set(x, y, z);
+    heroVis.add(m);
+    return m;
+  }
+  part(new THREE.CylinderGeometry(0.42, 0.5, 1.1, 12), 0x4d73d9, 0, 0.6, 0);
+  part(new THREE.SphereGeometry(0.36, 14, 10), 0xe2e2eb, 0, 1.4, 0);
+  part(new THREE.BoxGeometry(0.1, 0.3, 0.32), 0xd93333, 0, 1.8, 0);
+  part(new THREE.BoxGeometry(0.1, 0.1, 1.0), 0xf2f2ff, 0.55, 0.9, 0.5);
+  heroGroup.add(heroVis);
+  scene.add(heroGroup);
+
+  // instanced enemies (one draw call per type)
+  var CAP = 260;
+  var emesh = {};
+  ETYPES.forEach(function (t) {
+    var d = ENEMY[t];
+    var geo = d.shape === 'sphere' ? new THREE.SphereGeometry(0.5, 12, 8)
+            : d.shape === 'cyl' ? new THREE.CylinderGeometry(0.5, 0.5, 2, 10)
+            : new THREE.BoxGeometry(1, 1, 1);
+    var m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), CAP);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.frustumCulled = false;
+    for (var i = 0; i < CAP; i++) m.setColorAt(i, new THREE.Color(d.color));
+    m.count = 0;
+    scene.add(m);
+    emesh[t] = m;
+  });
+
+  var gemMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0x5ad8ff }), 500);
+  gemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  gemMesh.frustumCulled = false; gemMesh.count = 0;
+  scene.add(gemMesh);
+
+  var boltMat = new THREE.MeshBasicMaterial({ color: 0xffd84d });
+  var boltGeo = new THREE.SphereGeometry(0.18, 8, 6);
+  var bladeGeo = new THREE.BoxGeometry(0.25, 0.2, 0.9);
+  var bladeMat = new THREE.MeshLambertMaterial({ color: 0x99e6ff });
+  var pulseMesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.04, 40), new THREE.MeshBasicMaterial({ color: 0xfff2a0, transparent: true, opacity: 0.5 }));
+  pulseMesh.visible = false;
+  scene.add(pulseMesh);
+
+  // ---------- game state ----------
+  var G, boltMeshes = [], blades = [];
+  var dummy = new THREE.Object3D();
+  var WHITE = new THREE.Color(0xffffff);
+
+  function fresh() {
+    return {
+      phase: 'play', t: 0, level: 1, exp: 0, kills: 0, pending: 0, choices: null,
+      hero: { x: 0, z: 0, hp: 100, face: 0 },
+      st: { dmg: 1, spd: 1, move: 5, magnet: 2.5, maxHp: 100 },
+      skills: [{ id: 'bolt', lvl: 1, timer: 0, bolts: [] }],
+      enemies: [], gems: [], spawnT: 0, elite: false, orbitAngle: 0, orbitHit: new Map(), pulseT: 1, pulseFlash: 0, focusX: 0, focusZ: 0, now: 0
+    };
+  }
+
+  function recompute() {
+    var s = G.st; s.dmg = 1; s.spd = 1; s.move = 5; s.magnet = 2.5; s.maxHp = 100;
+    G.skills.forEach(function (k) {
+      if (k.id === 'might') s.dmg += 0.15 * k.lvl;
+      if (k.id === 'haste') s.spd += 0.12 * k.lvl;
+      if (k.id === 'boots') s.move += 0.5 * k.lvl;
+      if (k.id === 'magnet') s.magnet += 1.2 * k.lvl;
+      if (k.id === 'vital') s.maxHp += 20 * k.lvl;
+    });
+  }
+  function skillOf(id) { for (var i = 0; i < G.skills.length; i++) if (G.skills[i].id === id) return G.skills[i]; return null; }
+
+  // ---------- input ----------
+  var keys = {}, joy = { on: false, id: null, ox: 0, oy: 0, mx: 0, my: 0 };
+  var JR = 70;
+  var joyBase = document.getElementById('joyBase'), joyKnob = document.getElementById('joyKnob');
+  window.addEventListener('keydown', function (e) { keys[e.key.toLowerCase()] = true; });
+  window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+  stage.addEventListener('pointerdown', function (e) {
+    if (joy.on) return;
+    joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.mx = 0; joy.my = 0;
+    try { stage.setPointerCapture(e.pointerId); } catch (x) {}
+    joyBase.style.display = joyKnob.style.display = 'block';
+    joyBase.style.left = joyKnob.style.left = e.clientX + 'px';
+    joyBase.style.top = joyKnob.style.top = e.clientY + 'px';
+    document.getElementById('hint').style.opacity = 0;
+  });
+  stage.addEventListener('pointermove', function (e) {
+    if (!joy.on || e.pointerId !== joy.id) return;
+    var dx = e.clientX - joy.ox, dy = e.clientY - joy.oy, d = Math.hypot(dx, dy);
+    if (d > JR) { joy.ox = e.clientX - dx / d * JR; joy.oy = e.clientY - dy / d * JR; dx = e.clientX - joy.ox; dy = e.clientY - joy.oy; }
+    joy.mx = dx / JR; joy.my = dy / JR; // screen y grows downward = world +z
+    joyBase.style.left = joy.ox + 'px'; joyBase.style.top = joy.oy + 'px';
+    joyKnob.style.left = e.clientX + 'px'; joyKnob.style.top = e.clientY + 'px';
+  });
+  function endJoy(e) {
+    if (e.pointerId !== joy.id) return;
+    joy.on = false; joy.mx = joy.my = 0;
+    joyBase.style.display = joyKnob.style.display = 'none';
+  }
+  stage.addEventListener('pointerup', endJoy);
+  stage.addEventListener('pointercancel', endJoy);
+
+  function readMove() {
+    var x = joy.mx, z = joy.my;
+    var kx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
+    var kz = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
+    if (kx || kz) { var l = Math.hypot(kx, kz); x = kx / l; z = kz / l; }
+    return [x, z];
+  }
+
+  // ---------- spatial hash ----------
+  var hash = new Map();
+  function hkey(cx, cz) { return cx * 100003 + cz; }
+  function hashBuild() {
+    hash.clear();
+    var es = G.enemies;
+    for (var i = 0; i < es.length; i++) {
+      var e = es[i]; if (e.dead) continue;
+      var k = hkey(Math.floor(e.x / 2), Math.floor(e.z / 2));
+      var a = hash.get(k); if (!a) { a = []; hash.set(k, a); }
+      a.push(e);
+    }
+  }
+  function hashQuery(x, z, r, out) {
+    out.length = 0;
+    var x0 = Math.floor((x - r) / 2), x1 = Math.floor((x + r) / 2), z0 = Math.floor((z - r) / 2), z1 = Math.floor((z + r) / 2);
+    for (var cx = x0; cx <= x1; cx++) for (var cz = z0; cz <= z1; cz++) {
+      var a = hash.get(hkey(cx, cz)); if (a) for (var i = 0; i < a.length; i++) out.push(a[i]);
+    }
+  }
+  var tmpA = [], tmpB = [], tmpC = [];
+  function queryCircle(x, z, r, out) {
+    hashQuery(x, z, r + 1, tmpC);
+    out.length = 0;
+    for (var i = 0; i < tmpC.length; i++) {
+      var e = tmpC[i]; if (e.dead) continue;
+      var dx = e.x - x, dz = e.z - z, rr = r + e.def.r;
+      if (dx * dx + dz * dz <= rr * rr) out.push(e);
+    }
+  }
+
+  function damage(e, amt) {
+    if (e.dead) return;
+    e.hp -= amt; e.flash = 0.07;
+    if (e.hp > 0) return;
+    e.dead = true; G.kills++;
+    G.gems.push({ x: e.x, z: e.z, v: e.def.exp, att: false });
+  }
+
+  // ---------- run flow ----------
+  function spawnOne(type) {
+    var def = ENEMY[type], a = Math.random() * Math.PI * 2;
+    G.enemies.push({ type: type, def: def, x: G.hero.x + Math.cos(a) * CFG.spawnR, z: G.hero.z + Math.sin(a) * CFG.spawnR,
+      hp: def.hp * (1 + G.t / 60 * 0.35), cd: 0, dead: false, flash: 0, ang: 0, ph: Math.random() * 6 });
+  }
+
+  function spawnTick(dt) {
+    var prog = Math.min(1, G.t / CFG.dur);
+    if (!G.elite && G.t >= CFG.elite) { G.elite = true; spawnOne('brute'); }
+    G.spawnT -= dt;
+    if (G.spawnT > 0) return;
+    G.spawnT = 0.8 + (0.15 - 0.8) * prog;
+    var batch = 1 + Math.floor(G.t / 60);
+    for (var i = 0; i < batch && G.enemies.length < CFG.max; i++) {
+      spawnOne(G.t > 45 && Math.random() < 0.35 ? 'skeleton' : 'slime');
+    }
+  }
+
+  function enemyTick(dt) {
+    var h = G.hero, es = G.enemies;
+    hashBuild();
+    for (var i = 0; i < es.length; i++) {
+      var e = es[i]; if (e.dead) continue;
+      var dx = h.x - e.x, dz = h.z - e.z, dist = Math.hypot(dx, dz);
+      var nx = dist > 0.001 ? dx / dist : 0, nz = dist > 0.001 ? dz / dist : 0;
+      var px = 0, pz = 0, md = e.def.r * 2;
+      hashQuery(e.x, e.z, md, tmpA);
+      for (var k = 0; k < tmpA.length; k++) {
+        var o = tmpA[k]; if (o === e) continue;
+        var ox = e.x - o.x, oz = e.z - o.z, d2 = ox * ox + oz * oz;
+        if (d2 < md * md && d2 > 0.0001) { var d = Math.sqrt(d2), pu = (md - d) / md; px += ox / d * pu; pz += oz / d * pu; }
+      }
+      var sp = e.def.speed;
+      e.x += (nx * sp + px * sp * 1.5) * dt;
+      e.z += (nz * sp + pz * sp * 1.5) * dt;
+      if (dist > 0.001) e.ang = Math.atan2(nx, nz);
+      e.cd -= dt; e.flash -= dt;
+      if (e.cd <= 0 && dist < e.def.r + 0.5) { h.hp -= e.def.dmg; e.cd = 0.8; if (h.hp <= 0) { h.hp = 0; G.phase = 'fail'; showResult(); } }
+    }
+  }
+
+  function skillTick(dt) {
+    var h = G.hero, st = G.st, now = G.now;
+    G.skills.forEach(function (k) {
+      if (k.id === 'bolt') {
+        k.timer -= dt * st.spd;
+        if (k.timer <= 0) {
+          queryCircle(h.x, h.z, 12, tmpB);
+          if (tmpB.length) {
+            tmpB.sort(function (a, b) { return ((a.x - h.x) * (a.x - h.x) + (a.z - h.z) * (a.z - h.z)) - ((b.x - h.x) * (b.x - h.x) + (b.z - h.z) * (b.z - h.z)); });
+            var n = BOLT.count[k.lvl - 1];
+            for (var i = 0; i < n; i++) {
+              var t = tmpB[Math.min(i, tmpB.length - 1)];
+              var dx = t.x - h.x, dz = t.z - h.z, l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+              if (i >= tmpB.length) { var an = (i % 2 ? -1 : 1) * 10 * Math.PI / 180 * (i - tmpB.length + 1), c = Math.cos(an), s = Math.sin(an); var rx = dx * c - dz * s, rz = dx * s + dz * c; dx = rx; dz = rz; }
+              k.bolts.push({ x: h.x, z: h.z, dx: dx, dz: dz, life: 12 / 14 + 0.3, dmg: BOLT.dmg[k.lvl - 1] * st.dmg, pierce: BOLT.pierce[k.lvl - 1], hit: [] });
+            }
+            k.timer = BOLT.cd[k.lvl - 1];
+          }
+        }
+        for (var bi = k.bolts.length - 1; bi >= 0; bi--) {
+          var b = k.bolts[bi];
+          b.x += b.dx * 14 * dt; b.z += b.dz * 14 * dt; b.life -= dt;
+          queryCircle(b.x, b.z, 0.25, tmpB);
+          for (var q = 0; q < tmpB.length && b.pierce > 0; q++) {
+            if (b.hit.indexOf(tmpB[q]) >= 0) continue;
+            b.hit.push(tmpB[q]); damage(tmpB[q], b.dmg); b.pierce--;
+          }
+          if (b.pierce <= 0 || b.life <= 0) k.bolts.splice(bi, 1);
+        }
+      } else if (k.id === 'orbit') {
+        G.orbitAngle += 200 * dt;
+        var cnt = ORBIT.count[k.lvl - 1];
+        for (var i2 = 0; i2 < cnt; i2++) {
+          var a = (G.orbitAngle + 360 * i2 / cnt) * Math.PI / 180;
+          var bx = h.x + Math.cos(a) * 2.2, bz = h.z + Math.sin(a) * 2.2;
+          k.blades = k.blades || [];
+          k.blades[i2] = { x: bx, z: bz, a: a };
+          queryCircle(bx, bz, 0.5, tmpB);
+          for (var q2 = 0; q2 < tmpB.length; q2++) {
+            var nx2 = G.orbitHit.get(tmpB[q2]);
+            if (nx2 !== undefined && now < nx2) continue;
+            G.orbitHit.set(tmpB[q2], now + 0.4);
+            damage(tmpB[q2], ORBIT.dmg[k.lvl - 1] * st.dmg);
+          }
+        }
+      } else if (k.id === 'pulse') {
+        G.pulseT -= dt * st.spd;
+        if (G.pulseT <= 0) {
+          G.pulseT = PULSE.interval[k.lvl - 1];
+          var r = PULSE.radius[k.lvl - 1];
+          queryCircle(h.x, h.z, r, tmpB);
+          for (var q3 = 0; q3 < tmpB.length; q3++) damage(tmpB[q3], PULSE.dmg[k.lvl - 1] * st.dmg);
+          pulseMesh.scale.set(r, 1, r); G.pulseFlash = 0.18;
+        }
+      }
+    });
+    if (G.pulseFlash > 0) G.pulseFlash -= dt;
+  }
+
+  function gemTick(dt) {
+    var h = G.hero, mg = G.st.magnet;
+    for (var i = G.gems.length - 1; i >= 0; i--) {
+      var g = G.gems[i], dx = h.x - g.x, dz = h.z - g.z, d = Math.hypot(dx, dz);
+      if (d < mg) g.att = true;
+      if (g.att && d > 0.001) { var sp = 10 + 8 * Math.max(0, Math.min(1, 1 - d / mg)); g.x += dx / d * sp * dt; g.z += dz / d * sp * dt; }
+      if (d < 0.6) { G.gems.splice(i, 1); addExp(g.v); }
+    }
+  }
+
+  function addExp(v) {
+    G.exp += v;
+    while (G.exp >= expReq(G.level)) { G.exp -= expReq(G.level); G.level++; G.pending++; }
+    if (G.pending > 0 && G.phase === 'play') openLevelUp();
+  }
+
+  function rollChoices() {
+    var act = 0, pas = 0;
+    G.skills.forEach(function (k) { if (SKILLS[k.id].active) act++; else pas++; });
+    var pool = SKILL_IDS.filter(function (id) {
+      var k = skillOf(id);
+      if (k) return k.lvl < SKILLS[id].txt.length;
+      return SKILLS[id].active ? act < CFG.maxActive : pas < CFG.maxPassive;
+    });
+    for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+    pool = pool.slice(0, 3);
+    return pool.length ? pool : ['heal'];
+  }
+
+  var overlay = document.getElementById('overlay');
+  function openLevelUp() {
+    G.phase = 'level'; G.choices = rollChoices(); renderCards();
+  }
+  function renderCards() {
+    overlay.innerHTML = '';
+    var h2 = document.createElement('h2'); h2.textContent = '레벨 업!  스킬을 선택하세요'; overlay.appendChild(h2);
+    var wrap = document.createElement('div'); wrap.className = 'cards';
+    G.choices.forEach(function (id) {
+      var def = SKILLS[id], k = skillOf(id), cur = k ? k.lvl : 0, next = Math.min(def.txt.length, cur + 1);
+      var b = document.createElement('button'); b.className = 'card';
+      b.innerHTML = '<div class="k">' + (id === 'heal' ? '' : (def.active ? '액티브' : '패시브')) + '</div><div class="n">' + def.name + '  ' +
+        (cur === 0 ? 'NEW' : 'Lv.' + cur + ' → Lv.' + next) + '</div><div class="d">' + def.txt[next - 1] + '</div>';
+      b.addEventListener('click', function () { pick(id); });
+      wrap.appendChild(b);
+    });
+    overlay.appendChild(wrap);
+    overlay.style.display = 'flex';
+  }
+  function pick(id) {
+    if (G.phase !== 'level') return;
+    if (id === 'heal') { G.hero.hp = Math.min(G.st.maxHp, G.hero.hp + G.st.maxHp * 0.3); }
+    else {
+      var old = G.st.maxHp, k = skillOf(id);
+      if (k) k.lvl = Math.min(SKILLS[id].txt.length, k.lvl + 1); else G.skills.push({ id: id, lvl: 1, timer: 0, bolts: [] });
+      recompute();
+      if (G.st.maxHp > old) G.hero.hp += G.st.maxHp - old;
+    }
+    G.pending--;
+    if (G.pending > 0) { G.choices = rollChoices(); renderCards(); }
+    else { G.phase = 'play'; overlay.style.display = 'none'; }
+  }
+  function showResult() {
+    var clear = G.phase === 'clear';
+    overlay.innerHTML = '<h2>' + (clear ? '스테이지 클리어!' : '패배') + '</h2><p>Lv.' + G.level + ' · 처치 ' + G.kills + '<br>생존 ' + Math.floor(G.t) + '초</p>';
+    var b = document.createElement('button'); b.className = 'btn'; b.textContent = '다시 하기';
+    b.addEventListener('click', start);
+    overlay.appendChild(b);
+    overlay.style.display = 'flex';
+  }
+
+  function start() {
+    G = fresh();
+    overlay.style.display = 'none';
+    ETYPES.forEach(function (t) { emesh[t].count = 0; });
+    boltMeshes.forEach(function (m) { m.visible = false; });
+    blades.forEach(function (m) { m.visible = false; });
+    document.getElementById('hint').style.opacity = 1;
+  }
+
+  // ---------- render sync ----------
+  function renderSync() {
+    var h = G.hero;
+    heroGroup.position.set(h.x, 0, h.z);
+    var counts = { slime: 0, skeleton: 0, brute: 0 };
+    var es = G.enemies;
+    for (var i = 0; i < es.length; i++) {
+      var e = es[i]; if (e.dead) continue;
+      var m = emesh[e.type], idx = counts[e.type];
+      if (idx >= CAP) continue;
+      counts[e.type]++;
+      var s = e.def.scale;
+      dummy.position.set(e.x, e.def.baseY + Math.abs(Math.sin(G.now * 7 + e.ph)) * 0.12, e.z);
+      dummy.rotation.set(0, e.ang, 0);
+      dummy.scale.set(s[0], s[1], s[2]);
+      dummy.updateMatrix();
+      m.setMatrixAt(idx, dummy.matrix);
+      m.setColorAt(idx, e.flash > 0 ? WHITE : (e.def.c || (e.def.c = new THREE.Color(e.def.color))));
+    }
+    ETYPES.forEach(function (t) {
+      var m = emesh[t]; m.count = counts[t];
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    });
+
+    var gs = G.gems; var gn = Math.min(gs.length, 500);
+    for (var j = 0; j < gn; j++) { dummy.position.set(gs[j].x, 0.3, gs[j].z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); gemMesh.setMatrixAt(j, dummy.matrix); }
+    gemMesh.count = gn; gemMesh.instanceMatrix.needsUpdate = true;
+
+    var bk = skillOf('bolt'), bc = 0;
+    if (bk) bk.bolts.forEach(function (b) {
+      var mesh = boltMeshes[bc];
+      if (!mesh) { mesh = new THREE.Mesh(boltGeo, boltMat); scene.add(mesh); boltMeshes.push(mesh); }
+      mesh.visible = true; mesh.position.set(b.x, 0.8, b.z); bc++;
+    });
+    for (var q = bc; q < boltMeshes.length; q++) boltMeshes[q].visible = false;
+
+    var ok = skillOf('orbit'), oc = 0;
+    if (ok && ok.blades) for (var w = 0; w < ORBIT.count[ok.lvl - 1]; w++) {
+      var bl = ok.blades[w]; if (!bl) continue;
+      var bm = blades[w];
+      if (!bm) { bm = new THREE.Mesh(bladeGeo, bladeMat); scene.add(bm); blades[w] = bm; }
+      bm.visible = true; bm.position.set(bl.x, 0.8, bl.z); bm.rotation.y = -bl.a; oc++;
+    }
+    for (var u = oc; u < blades.length; u++) if (blades[u]) blades[u].visible = false;
+
+    pulseMesh.visible = G.pulseFlash > 0;
+    if (pulseMesh.visible) pulseMesh.position.set(h.x, 0.05, h.z);
+
+    ground.position.set(Math.round(h.x / PERIOD) * PERIOD, 0, Math.round(h.z / PERIOD) * PERIOD);
+
+    // camera
+    var k = 1 - Math.exp(-10 * 0.016);
+    G.focusX += (h.x - G.focusX) * k; G.focusZ += (h.z - G.focusZ) * k;
+    camera.position.set(G.focusX, Math.sin(CFG.pitch) * CFG.dist, G.focusZ + Math.cos(CFG.pitch) * CFG.dist);
+    camera.lookAt(G.focusX, 0, G.focusZ);
+
+    // hud
+    document.getElementById('xp').style.width = Math.min(100, G.exp / expReq(G.level) * 100) + '%';
+    document.getElementById('hp').style.width = Math.max(0, h.hp / G.st.maxHp * 100) + '%';
+    document.getElementById('info').textContent = 'Lv.' + G.level + '   처치 ' + G.kills;
+    var left = Math.max(0, Math.ceil(CFG.dur - G.t));
+    document.getElementById('timer').textContent = Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2);
+  }
+
+  // ---------- main loop ----------
+  var last = performance.now();
+  function frame(nowMs) {
+    var dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
+    if (G.phase === 'play') {
+      G.now += dt; G.t += dt;
+      var m = readMove(), h = G.hero;
+      h.x += m[0] * G.st.move * dt; h.z += m[1] * G.st.move * dt;
+      if (m[0] * m[0] + m[1] * m[1] > 0.01) h.face = Math.atan2(m[0], m[1]);
+      heroVis.rotation.y += (h.face - heroVis.rotation.y) * 0.25;
+      spawnTick(dt);
+      enemyTick(dt);
+      skillTick(dt);
+      gemTick(dt);
+      for (var i = G.enemies.length - 1; i >= 0; i--) if (G.enemies[i].dead) G.enemies.splice(i, 1);
+      if (G.t >= CFG.dur && G.phase === 'play') { G.phase = 'clear'; showResult(); }
+    }
+    renderSync();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  // test hook for automated checks
+  window.__dbg = function () { return G; };
+  window.__addExp = function (v) { addExp(v); };
+  window.__spawn = function (t) { spawnOne(t); };
+  start();
+  requestAnimationFrame(frame);
+})();
+</script>

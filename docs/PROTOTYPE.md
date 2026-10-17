@@ -36,3 +36,6 @@ Unity 6 프로젝트의 첫 프로토타입입니다. 목표는 **핵심 재미 
 - 이 코드는 Unity가 없는 환경에서 작성되어 **아직 한 번도 컴파일/실행해 보지 않았습니다.** 처음 열었을 때 오류가 나면 Console 내용을 알려주세요.
 - 머티리얼은 `Universal Render Pipeline/Lit`을 먼저 찾고 없으면 `Standard`를 씁니다. 빌드(APK)에서는 사용하는 셰이더가 포함되도록 `Project Settings > Graphics > Always Included Shaders`에 추가해야 할 수 있습니다.
 - 한글은 OS 폰트로 표시됩니다. 일부 기기에서 깨지면 정식 UI 단계에서 폰트를 포함합니다.
+
+## 웹 시안 (폰 브라우저)
+`web_prototype/index.html`은 Unity 프로토타입과 같은 규칙을 three.js로 옮긴 3D 쿼터뷰 시안입니다. 설치 없이 폰 브라우저에서 확인할 수 있습니다. 규칙과 수치는 Unity 버전과 같지만 성능과 그래픽은 실제 Unity 빌드와 다릅니다.

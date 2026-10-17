@@ -16,7 +16,7 @@ namespace Survivors
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.07f, 0.1f, 0.12f);
             cam.nearClipPlane = 0.3f;
-            cam.farClipPlane = 120f;
+            cam.farClipPlane = 160f;
             var h = Hero.I;
             _focus = h != null ? new Vector3(h.X, 0f, h.Z) : Vector3.zero;
             Apply();
