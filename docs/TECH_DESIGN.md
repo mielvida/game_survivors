@@ -104,7 +104,8 @@ class ItemInstance   { uid, defId, enhanceLevel, subStats[] }
 
 ### 4.4 스킬 시스템
 - 스킬 = `SkillDef`(데이터) + `SkillBehaviour`(실행 로직: 투사체/오라/궤도/소환 등 타입별 클래스).
-- 레벨업 카드 추첨: 가중치 기반, 보유 슬롯·최대 레벨·진화 조건·직업 제한 필터링.
+- **스킬 보유 상태는 캐릭터별**(`RunCharacterState.skills`)로 관리. 런 레벨업 시 `대상 캐릭터 선택 → 그 캐릭터 기준으로 카드 추첨`.
+- 레벨업 카드 추첨: 가중치 기반, 대상 캐릭터의 보유 슬롯(액티브 4/패시브 4)·최대 레벨·진화 조건·직업 제한 필터링.
 - 진화 판정: 상자 획득 시 조건 충족 스킬 진화.
 
 ### 4.5 보스
@@ -131,13 +132,25 @@ class ItemInstance   { uid, defId, enhanceLevel, subStats[] }
 
 ---
 
-## 6. 세이브 & 서버
+## 6. 광고 확장 구조 (수익 모델 보류 대응)
+- `IAdService { bool IsReady(AdPlacement p); void ShowRewarded(AdPlacement p, Action onRewarded, Action onFailed); }`
+- `AdPlacement`: `Revive`, `DoubleReward`, `RerollCard`, `DailyChest`.
+- 초기 구현: `NullAdService`(광고 UI 비노출 또는 즉시 보상) → 나중에 AdMob/AppLovin 등 SDK 구현체로 교체. 게임 코드는 인터페이스만 사용.
+- 광고 보상 수치는 데이터 테이블로 분리해 서버/원격 설정으로 조정 가능하게 한다.
+
+## 7. 기기 대응 구조
+- `DeviceProfile`(상/중/하): 첫 실행 시 SystemInfo(메모리, GPU, CPU 코어)로 자동 판정, 설정에서 수동 변경 가능.
+- 등급별 `QualitySettings` 데이터: 최대 적 수, 파티클 상한, 포스트프로세싱, 목표 FPS.
+- UI는 Canvas Scaler(기준 1080×1920) + Safe Area 컴포넌트 + 앵커 레이아웃. 비율별 카메라 시야(orthographic size) 보정.
+- 입력은 `IInputProvider`(터치 조이스틱 / 키보드 / 게임패드)로 추상화해 전투 로직과 분리.
+
+## 8. 세이브 & 서버
 - 1단계: 로컬 저장(JSON + AES 암호화 + 체크섬), 스테이지 종료·장비 변경 시 자동 저장.
 - 2단계(라이브 서비스 시): 서버 권위 방식으로 보상 검증 (치팅 방지), 클라우드 세이브.
 
 ---
 
-## 7. 프로젝트 폴더 구조 (예정)
+## 9. 프로젝트 폴더 구조 (예정)
 ```
 Assets/
   _Project/
@@ -164,7 +177,7 @@ docs/
 
 ---
 
-## 8. 개발 로드맵
+## 10. 개발 로드맵
 
 | 마일스톤 | 목표 | 주요 산출물 |
 |---|---|---|
@@ -177,7 +190,7 @@ docs/
 
 ---
 
-## 9. 기술 리스크
+## 11. 기술 리스크
 | 리스크 | 대응 |
 |---|---|
 | 고퀄 아트 + 대량 적 → 모바일 성능 저하 | M1에서 저사양 기기 기준 성능 목표 먼저 확보, 적은 경량 스프라이트 사용 |
