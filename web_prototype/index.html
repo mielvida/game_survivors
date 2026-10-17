@@ -29,6 +29,11 @@ body {
   padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); padding-top: 8px; }
 .hp { width: min(46vw, 240px); height: 14px; background: rgba(0,0,0,.55); border-radius: 7px; overflow: hidden; }
 .hp > i { display: block; height: 100%; width: 100%; background: var(--hp); }
+.wv { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.wbar { width: min(40vw, 180px); height: 10px; background: rgba(0,0,0,.55); border-radius: 5px; overflow: hidden; }
+.wbar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#banner { position: absolute; left: 0; right: 0; top: 28%; text-align: center; font-size: clamp(30px, 9vw, 52px); font-weight: 800; letter-spacing: .04em;
+  text-shadow: 0 2px 8px #000; pointer-events: none; opacity: 0; transition: opacity .35s; padding: 0 16px; }
 .info { font-size: 14px; margin-top: 6px; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
 .timer { font-size: 22px; font-weight: 700; text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
 #joyBase, #joyKnob { position: absolute; border-radius: 50%; display: none; }
@@ -70,11 +75,12 @@ body {
       <div class="hp"><i id="hp"></i></div>
       <div class="info" id="info">Lv.1</div>
     </div>
-    <div class="timer" id="timer">5:00</div>
+    <div class="wv"><div class="timer" id="wave">웨이브 1/6</div><div class="wbar"><i id="wprog"></i></div></div>
   </div>
   <div id="joyBase"></div><div id="joyKnob"></div>
   <div id="hint">화면을 누르고 드래그해서 이동 · 공격은 자동</div>
 </div>
+<div id="banner"></div>
 <div id="overlay"></div>
 <div id="err"></div>
 
@@ -87,7 +93,7 @@ body {
   if (!window.THREE) { errBox.textContent = '3D 라이브러리를 불러오지 못했습니다.'; return; }
 
   // ---------- config & data (mirrors the Unity prototype) ----------
-  var CFG = { dur: 300, max: 200, spawnR: 26, pitch: 55 * Math.PI / 180, dist: 44, fov: 40, elite: 150, maxActive: 4, maxPassive: 4 };
+  var CFG = { max: 200, spawnR: 26, pitch: 55 * Math.PI / 180, dist: 44, fov: 40, elite: 150, maxActive: 4, maxPassive: 4 };
   var expReq = function (l) { return 2 + 2 * l + Math.floor(l * l / 4); };
 
   var ENEMY = {
@@ -95,7 +101,16 @@ body {
     skeleton: { hp: 32,  speed: 2.5, dmg: 8,  r: 0.4, exp: 2,  color: 0xe0dbbf, scale: [0.6, 0.6, 0.6], shape: 'cyl',    baseY: 0.6 },
     brute:    { hp: 550, speed: 2.0, dmg: 16, r: 0.8, exp: 25, color: 0xb33833, scale: [1.5, 1.5, 1.5], shape: 'box',    baseY: 0.75 }
   };
-  var ETYPES = ['slime', 'skeleton', 'brute'];
+  var WAVES = [
+  { q: 20, iv: 1.0,  b: 1, sk: 0 },
+  { q: 30, iv: 0.85, b: 1, sk: 0 },
+  { q: 40, iv: 0.7,  b: 2, sk: 0.25 },
+  { q: 50, iv: 0.6,  b: 2, sk: 0.3 },
+  { q: 60, iv: 0.5,  b: 2, sk: 0.35 },
+  { q: 45, iv: 0.5,  b: 3, sk: 0.4, boss: true }
+];
+var WAVE_TIME_LIMIT = 70, INTERMISSION = 3;
+var ETYPES = ['slime', 'skeleton', 'brute'];
 
   var SKILLS = {
     bolt:   { name: '마법 화살',   active: true,  txt: ['가까운 적에게 화살 1발', '피해 +20%', '화살 +1발', '관통 +1, 연사 속도 증가', '화살 +1발, 피해 증가'] },
@@ -209,7 +224,7 @@ body {
       hero: { x: 0, z: 0, hp: 120, face: 0 },
       st: { dmg: 1, spd: 1, move: 5.5, magnet: 3, maxHp: 120 },
       skills: [{ id: 'bolt', lvl: 1, timer: 0, bolts: [] }],
-      enemies: [], gems: [], spawnT: 0, elite: false, orbitAngle: 0, orbitHit: new Map(), pulseT: 1, pulseFlash: 0, focusX: 0, focusZ: 0, now: 0
+      enemies: [], gems: [], spawnT: 0, wave: 0, spawned: 0, waveKills: 0, waveT: 0, inter: 0, bannerT: 0, bannerText: '', orbitAngle: 0, orbitHit: new Map(), pulseT: 1, pulseFlash: 0, focusX: 0, focusZ: 0, now: 0
     };
   }
 
@@ -295,11 +310,13 @@ body {
     }
   }
 
+  function banner(text, t) { G.bannerText = text; G.bannerT = t; }
+
   function damage(e, amt) {
     if (e.dead) return;
     e.hp -= amt; e.flash = 0.07;
     if (e.hp > 0) return;
-    e.dead = true; G.kills++;
+    e.dead = true; G.kills++; G.waveKills++;
     G.gems.push({ x: e.x, z: e.z, v: e.def.exp, att: false });
   }
 
@@ -307,18 +324,46 @@ body {
   function spawnOne(type) {
     var def = ENEMY[type], a = Math.random() * Math.PI * 2;
     G.enemies.push({ type: type, def: def, x: G.hero.x + Math.cos(a) * CFG.spawnR, z: G.hero.z + Math.sin(a) * CFG.spawnR,
-      hp: def.hp * (1 + G.t / 60 * 0.3), cd: 0, dead: false, flash: 0, ang: 0, ph: Math.random() * 6 });
+      hp: def.hp * (1 + 0.15 * G.wave), cd: 0, dead: false, flash: 0, ang: 0, ph: Math.random() * 6 });
   }
 
-  function spawnTick(dt) {
-    var prog = Math.min(1, G.t / CFG.dur);
-    if (!G.elite && G.t >= CFG.elite) { G.elite = true; spawnOne('brute'); }
-    G.spawnT -= dt;
-    if (G.spawnT > 0) return;
-    G.spawnT = 1.1 + (0.25 - 1.1) * prog;
-    var batch = 1 + Math.floor(G.t / 70);
-    for (var i = 0; i < batch && G.enemies.length < CFG.max; i++) {
-      spawnOne(G.t > 50 && Math.random() < 0.3 ? 'skeleton' : 'slime');
+  function startWave(i) {
+    G.wave = i; G.spawned = 0; G.waveKills = 0; G.waveT = 0; G.spawnT = 0.5;
+    var w = WAVES[i];
+    banner('WAVE ' + (i + 1) + (w.boss ? '  ·  엘리트 등장' : ''), 2);
+    if (w.boss) { spawnOne('brute'); G.spawned = 1; }
+  }
+
+  function aliveCount() {
+    var n = 0;
+    for (var i = 0; i < G.enemies.length; i++) if (!G.enemies[i].dead) n++;
+    return n;
+  }
+
+  function waveTick(dt) {
+    if (G.bannerT > 0) G.bannerT -= dt;
+    if (G.inter > 0) { G.inter -= dt; if (G.inter <= 0) startWave(G.wave + 1); return; }
+    var w = WAVES[G.wave], last = G.wave === WAVES.length - 1;
+    G.waveT += dt;
+    if (G.spawned < w.q) {
+      G.spawnT -= dt;
+      if (G.spawnT <= 0) {
+        G.spawnT = w.iv;
+        for (var i = 0; i < w.b && G.spawned < w.q && G.enemies.length < CFG.max; i++) {
+          spawnOne(Math.random() < w.sk ? 'skeleton' : 'slime'); G.spawned++;
+        }
+      }
+    }
+    var all = G.spawned >= w.q;
+    var cleared = all && aliveCount() === 0;
+    var timeout = all && !last && G.waveT > WAVE_TIME_LIMIT;
+    if (cleared || timeout) {
+      if (last) { G.phase = 'clear'; showResult(); }
+      else {
+        G.inter = INTERMISSION;
+        G.hero.hp = Math.min(G.st.maxHp, G.hero.hp + G.st.maxHp * 0.1);
+        banner('웨이브 ' + (G.wave + 1) + ' 클리어!', 2.5);
+      }
     }
   }
 
@@ -482,7 +527,7 @@ body {
   }
   function showResult() {
     var clear = G.phase === 'clear';
-    overlay.innerHTML = '<h2>' + (clear ? '스테이지 클리어!' : '패배') + '</h2><p>Lv.' + G.level + ' · 처치 ' + G.kills + '<br>생존 ' + Math.floor(G.t) + '초</p>';
+    overlay.innerHTML = '<h2>' + (clear ? '스테이지 클리어!' : '패배') + '</h2><p>Lv.' + G.level + ' · 처치 ' + G.kills + '<br>소요 시간 ' + Math.floor(G.t / 60) + '분 ' + Math.floor(G.t % 60) + '초</p>';
     var b = document.createElement('button'); b.className = 'btn'; b.textContent = '다시 하기';
     b.addEventListener('click', start);
     overlay.appendChild(b);
@@ -491,6 +536,7 @@ body {
 
   function start() {
     G = fresh();
+    startWave(0);
     overlay.style.display = 'none';
     ETYPES.forEach(function (t) { emesh[t].count = 0; });
     boltMeshes.forEach(function (m) { m.visible = false; });
@@ -559,8 +605,11 @@ body {
     document.getElementById('xp').style.width = Math.min(100, G.exp / expReq(G.level) * 100) + '%';
     document.getElementById('hp').style.width = Math.max(0, h.hp / G.st.maxHp * 100) + '%';
     document.getElementById('info').textContent = 'Lv.' + G.level + '   처치 ' + G.kills;
-    var left = Math.max(0, Math.ceil(CFG.dur - G.t));
-    document.getElementById('timer').textContent = Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2);
+    document.getElementById('wave').textContent = '웨이브 ' + (G.wave + 1) + '/' + WAVES.length;
+    document.getElementById('wprog').style.width = Math.min(100, G.waveKills / WAVES[G.wave].q * 100) + '%';
+    var bn = document.getElementById('banner');
+    bn.textContent = G.bannerText;
+    bn.style.opacity = G.bannerT > 0 ? 1 : 0;
   }
 
   // ---------- main loop ----------
@@ -573,12 +622,11 @@ body {
     if (m[0] * m[0] + m[1] * m[1] > 0.01) h.face = Math.atan2(m[0], m[1]);
     heroVis.rotation.y += (h.face - heroVis.rotation.y) * 0.25;
     h.hp = Math.min(G.st.maxHp, h.hp + 0.5 * dt);
-    spawnTick(dt);
+    waveTick(dt);
     enemyTick(dt);
     skillTick(dt);
     gemTick(dt);
     for (var i = G.enemies.length - 1; i >= 0; i--) if (G.enemies[i].dead) G.enemies.splice(i, 1);
-    if (G.t >= CFG.dur && G.phase === 'play') { G.phase = 'clear'; showResult(); }
   }
 
   function frame(nowMs) {

@@ -55,6 +55,14 @@ namespace Survivors
             DrawJoystick(s);
             DrawTopBar(run, hero, W);
 
+            if (run.BannerTime > 0f && run.Phase == RunPhase.Playing)
+            {
+                var prev = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(run.BannerTime * 2f));
+                GUI.Label(new Rect(0, H * 0.28f, W, 70), run.BannerText, _title);
+                GUI.color = prev;
+            }
+
             if (run.Phase == RunPhase.LevelUp) DrawLevelUp(run, W, H);
             else if (run.Phase == RunPhase.Cleared) DrawResult("스테이지 클리어!", run, W, H);
             else if (run.Phase == RunPhase.Failed) DrawResult("패배", run, W, H);
@@ -84,9 +92,11 @@ namespace Survivors
             Fill(new Rect(12, 26, 260, 18), new Color(0, 0, 0, 0.6f));
             Fill(new Rect(12, 26, 260 * Mathf.Clamp01(hero.Hp / hero.Stats.MaxHp), 18), new Color(0.85f, 0.25f, 0.25f));
 
-            int left = Mathf.Max(0, Mathf.CeilToInt(Config.StageDuration - run.Elapsed));
             GUI.Label(new Rect(12, 48, 300, 30), "Lv." + run.Level + "   처치 " + run.Kills, _label);
-            GUI.Label(new Rect(W - 130, 22, 120, 30), (left / 60) + ":" + (left % 60).ToString("00"), _label);
+            var right = new GUIStyle(_label) { alignment = TextAnchor.UpperRight };
+            GUI.Label(new Rect(W - 212, 22, 200, 30), "웨이브 " + (run.Wave + 1) + "/" + run.WaveCount, right);
+            Fill(new Rect(W - 172, 54, 160, 10), new Color(0, 0, 0, 0.6f));
+            Fill(new Rect(W - 172, 54, 160 * run.WaveProgress, 10), new Color(1f, 0.79f, 0.29f));
         }
 
         void DrawLevelUp(RunController run, float W, float H)
@@ -144,7 +154,7 @@ namespace Survivors
             Fill(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.7f));
             GUI.Label(new Rect(0, H * 0.25f, W, 60), title, _title);
             var center = new GUIStyle(_label) { alignment = TextAnchor.MiddleCenter };
-            GUI.Label(new Rect(0, H * 0.25f + 70, W, 80), "Lv." + run.Level + "   처치 " + run.Kills + "\n생존 " + Mathf.FloorToInt(run.Elapsed) + "초", center);
+            GUI.Label(new Rect(0, H * 0.25f + 70, W, 80), "Lv." + run.Level + "   처치 " + run.Kills + "\n소요 시간 " + Mathf.FloorToInt(run.Elapsed / 60f) + "분 " + Mathf.FloorToInt(run.Elapsed % 60f) + "초", center);
             if (GUI.Button(new Rect(W / 2f - 130f, H * 0.25f + 180f, 260f, 70f), "다시 하기", _card))
                 Bootstrap.RequestRestart();
         }

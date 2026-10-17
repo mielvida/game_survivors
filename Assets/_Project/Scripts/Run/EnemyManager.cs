@@ -174,6 +174,14 @@ namespace Survivors
             }
         }
 
+        public int AliveCount()
+        {
+            int n = 0;
+            for (int i = 0; i < Active.Count; i++)
+                if (!Active[i].Dead) n++;
+            return n;
+        }
+
         public void Damage(Enemy e, float amount)
         {
             if (e.Dead) return;
@@ -181,7 +189,7 @@ namespace Survivors
             if (e.Hp > 0f) return;
             e.Dead = true;
             if (GemManager.I != null) GemManager.I.Drop(e.X, e.Z, e.Def.Exp);
-            if (RunController.I != null) RunController.I.Kills++;
+            if (RunController.I != null) RunController.I.OnEnemyKilled();
         }
     }
 }

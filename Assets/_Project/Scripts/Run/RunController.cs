@@ -15,13 +15,18 @@ namespace Survivors
         public int Level { get; private set; }
         public float Exp { get; private set; }
         public int Kills;
+        public int Wave { get; private set; }               // 0-based
+        public int WaveCount { get { return _waves.Length; } }
+        public string BannerText { get; private set; }
+        public float BannerTime { get; private set; }
         public readonly List<Skill> Skills = new List<Skill>();
         public List<SkillDef> Choices { get; private set; }
 
         Hero _hero;
         int _pendingLevelUps;
-        float _spawnTimer;
-        bool _eliteSpawned;
+        readonly WaveDef[] _waves = StageDefs.Stage1;
+        int _spawned, _waveKills;
+        float _spawnTimer, _waveTime, _intermission;
         readonly System.Random _rng = new System.Random();
 
         void Awake()
@@ -41,6 +46,18 @@ namespace Survivors
             Level = 1;
             Phase = RunPhase.Playing;
             GrantSkill(SkillLibrary.Bolt);
+            StartWave(0);
+        }
+
+        public float WaveProgress
+        {
+            get { return Mathf.Clamp01((float)_waveKills / _waves[Wave].Quota); }
+        }
+
+        public void OnEnemyKilled()
+        {
+            Kills++;
+            _waveKills++;
         }
 
         void GrantSkill(SkillDef def)
@@ -57,37 +74,73 @@ namespace Survivors
             float dt = Time.deltaTime;
             Elapsed += dt;
 
-            Spawn(dt);
+            WaveTick(dt);
             for (int i = 0; i < Skills.Count; i++) Skills[i].Tick(dt, _hero);
+        }
 
-            if (Elapsed >= Config.StageDuration)
+        void StartWave(int index)
+        {
+            Wave = index;
+            _spawned = 0;
+            _waveKills = 0;
+            _waveTime = 0f;
+            _spawnTimer = 0.5f;
+            var w = _waves[index];
+            BannerText = "WAVE " + (index + 1) + (w.Boss ? "  ·  엘리트 등장" : "");
+            BannerTime = 2f;
+            if (w.Boss)
+            {
+                SpawnOne(EnemyDefs.Brute);
+                _spawned = 1;
+            }
+        }
+
+        void WaveTick(float dt)
+        {
+            if (BannerTime > 0f) BannerTime -= dt;
+            if (_intermission > 0f)
+            {
+                _intermission -= dt;
+                if (_intermission <= 0f) StartWave(Wave + 1);
+                return;
+            }
+
+            var em = EnemyManager.I;
+            var w = _waves[Wave];
+            bool last = Wave == _waves.Length - 1;
+            _waveTime += dt;
+
+            if (_spawned < w.Quota)
+            {
+                _spawnTimer -= dt;
+                if (_spawnTimer <= 0f)
+                {
+                    _spawnTimer = w.Interval;
+                    for (int i = 0; i < w.Batch && _spawned < w.Quota && em.Active.Count < Config.MaxEnemies; i++)
+                    {
+                        bool skeleton = _rng.NextDouble() < w.SkeletonChance;
+                        SpawnOne(skeleton ? EnemyDefs.Skeleton : EnemyDefs.Slime);
+                        _spawned++;
+                    }
+                }
+            }
+
+            bool allSpawned = _spawned >= w.Quota;
+            bool cleared = allSpawned && em.AliveCount() == 0;
+            bool timeout = allSpawned && !last && _waveTime > w.TimeLimit;
+            if (!cleared && !timeout) return;
+
+            if (last)
             {
                 Phase = RunPhase.Cleared;
                 Time.timeScale = 0f;
             }
-        }
-
-        void Spawn(float dt)
-        {
-            var em = EnemyManager.I;
-            float progress = Mathf.Clamp01(Elapsed / Config.StageDuration);
-
-            if (!_eliteSpawned && Elapsed >= Config.EliteSpawnTime)
+            else
             {
-                _eliteSpawned = true;
-                SpawnOne(EnemyDefs.Brute);
-            }
-
-            _spawnTimer -= dt;
-            if (_spawnTimer > 0f) return;
-            _spawnTimer = Mathf.Lerp(1.1f, 0.25f, progress);
-
-            int batch = 1 + (int)(Elapsed / 70f);
-            for (int i = 0; i < batch && em.Active.Count < Config.MaxEnemies; i++)
-            {
-                var def = EnemyDefs.Slime;
-                if (Elapsed > 50f && _rng.NextDouble() < 0.3) def = EnemyDefs.Skeleton;
-                SpawnOne(def);
+                _intermission = StageDefs.IntermissionSeconds;
+                _hero.Heal(_hero.Stats.MaxHp * 0.1f);
+                BannerText = "웨이브 " + (Wave + 1) + " 클리어!";
+                BannerTime = 2.5f;
             }
         }
 
@@ -96,7 +149,7 @@ namespace Survivors
             float a = (float)_rng.NextDouble() * Mathf.PI * 2f;
             float x = _hero.X + Mathf.Cos(a) * Config.SpawnRadius;
             float z = _hero.Z + Mathf.Sin(a) * Config.SpawnRadius;
-            float hpMul = 1f + Elapsed / 60f * 0.3f;
+            float hpMul = 1f + 0.15f * Wave;
             EnemyManager.I.Spawn(def, x, z, hpMul);
         }
 
