@@ -6,7 +6,7 @@ namespace Survivors
         public static int Required(int level)
         {
             if (level < 1) level = 1;
-            return 4 + 3 * level + (level * level) / 2;
+            return 2 + 2 * level + (level * level) / 4;
         }
     }
 }

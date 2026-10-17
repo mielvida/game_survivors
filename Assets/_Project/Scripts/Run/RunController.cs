@@ -80,13 +80,13 @@ namespace Survivors
 
             _spawnTimer -= dt;
             if (_spawnTimer > 0f) return;
-            _spawnTimer = Mathf.Lerp(0.8f, 0.15f, progress);
+            _spawnTimer = Mathf.Lerp(1.6f, 0.4f, progress);
 
-            int batch = 1 + (int)(Elapsed / 60f);
+            int batch = 1 + (int)(Elapsed / 90f);
             for (int i = 0; i < batch && em.Active.Count < Config.MaxEnemies; i++)
             {
                 var def = EnemyDefs.Slime;
-                if (Elapsed > 45f && _rng.NextDouble() < 0.35) def = EnemyDefs.Skeleton;
+                if (Elapsed > 60f && _rng.NextDouble() < 0.25) def = EnemyDefs.Skeleton;
                 SpawnOne(def);
             }
         }
@@ -96,7 +96,7 @@ namespace Survivors
             float a = (float)_rng.NextDouble() * Mathf.PI * 2f;
             float x = _hero.X + Mathf.Cos(a) * Config.SpawnRadius;
             float z = _hero.Z + Mathf.Sin(a) * Config.SpawnRadius;
-            float hpMul = 1f + Elapsed / 60f * 0.35f;
+            float hpMul = 1f + Elapsed / 60f * 0.25f;
             EnemyManager.I.Spawn(def, x, z, hpMul);
         }
 

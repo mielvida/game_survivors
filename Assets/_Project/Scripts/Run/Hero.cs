@@ -7,18 +7,18 @@ namespace Survivors
     {
         public float DamageMul = 1f;
         public float AtkSpeedMul = 1f;
-        public float MoveSpeed = 5f;
-        public float Magnet = 2.5f;
-        public float MaxHp = 100f;
+        public float MoveSpeed = 5.5f;
+        public float Magnet = 3f;
+        public float MaxHp = 150f;
 
         // Derived from the passive skills the hero owns.
         public void Recompute(IList<Skill> skills)
         {
             DamageMul = 1f;
             AtkSpeedMul = 1f;
-            MoveSpeed = 5f;
-            Magnet = 2.5f;
-            MaxHp = 100f;
+            MoveSpeed = 5.5f;
+            Magnet = 3f;
+            MaxHp = 150f;
             for (int i = 0; i < skills.Count; i++)
             {
                 var s = skills[i];
@@ -77,6 +77,7 @@ namespace Survivors
             if (Dead) return;
 
             float dt = Time.deltaTime;
+            Hp = Mathf.Min(Stats.MaxHp, Hp + 1f * dt);
             Vector2 m = InputService.Move;
             X += m.x * Stats.MoveSpeed * dt;
             Z += m.y * Stats.MoveSpeed * dt;

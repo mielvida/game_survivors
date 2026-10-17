@@ -38,7 +38,7 @@ namespace Survivors
             if (_label != null) return;
             _label = new GUIStyle(GUI.skin.label) { fontSize = 22, normal = { textColor = Color.white } };
             _title = new GUIStyle(_label) { fontSize = 34, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-            _card = new GUIStyle(GUI.skin.button) { fontSize = 24, alignment = TextAnchor.MiddleLeft, wordWrap = true, padding = new RectOffset(20, 20, 10, 10) };
+            _card = new GUIStyle(GUI.skin.button) { fontSize = 24, alignment = TextAnchor.MiddleCenter, wordWrap = true, padding = new RectOffset(10, 10, 10, 10) };
         }
 
         void OnGUI()
@@ -91,21 +91,47 @@ namespace Survivors
 
         void DrawLevelUp(RunController run, float W, float H)
         {
-            Fill(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.65f));
-            GUI.Label(new Rect(0, H * 0.12f, W, 50), "레벨 업!  스킬을 선택하세요", _title);
+            Fill(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.7f));
+            GUI.Label(new Rect(0, H * 0.14f, W, 50), "레벨 업!  스킬을 선택하세요", _title);
 
-            float cw = Mathf.Min(W - 40f, 560f), ch = 120f, gap = 16f;
-            float x = (W - cw) / 2f, y = H * 0.25f;
             var choices = run.Choices;
+            float gap = 12f;
+            float total = Mathf.Min(W - 24f, 720f);
+            float cw = (total - gap * (choices.Count - 1)) / choices.Count;
+            float ch = Mathf.Min(300f, cw * 1.9f);
+            float x0 = (W - (cw * choices.Count + gap * (choices.Count - 1))) / 2f;
+            float y = H * 0.14f + 80f;
+            var center = new GUIStyle(_label) { alignment = TextAnchor.UpperCenter, wordWrap = true, fontSize = 17 };
+            var name = new GUIStyle(center) { fontSize = 20, fontStyle = FontStyle.Bold };
+            var small = new GUIStyle(center) { fontSize = 14, normal = { textColor = new Color(0.7f, 0.78f, 0.75f) } };
+
             for (int i = 0; i < choices.Count; i++)
             {
                 var def = choices[i];
                 int cur = SkillLibrary.LevelOf(run.Skills, def);
                 int next = Mathf.Min(def.MaxLevel, cur + 1);
-                string kind = def == SkillLibrary.Heal ? "" : (def.Active ? "[액티브] " : "[패시브] ");
-                string head = def.Name + "  " + (cur == 0 ? "NEW" : "Lv." + cur + " → Lv." + next);
-                string text = kind + head + "\n" + def.LevelText[next - 1];
-                if (GUI.Button(new Rect(x, y + i * (ch + gap), cw, ch), text, _card))
+                float x = x0 + i * (cw + gap);
+                var r = new Rect(x, y, cw, ch);
+
+                bool pressed = GUI.Button(r, GUIContent.none, _card);
+                Color accent = def.Active ? new Color(1f, 0.79f, 0.29f) : new Color(0.36f, 0.72f, 1f);
+                Fill(new Rect(x, y, cw, 4f), def == SkillLibrary.Heal ? new Color(0.3f, 0.8f, 0.5f) : accent);
+
+                float icon = Mathf.Min(cw - 24f, 96f);
+                GUI.DrawTexture(new Rect(x + (cw - icon) / 2f, y + 14f, icon, icon), SkillIcons.Get(def.Id));
+                float ty = y + 14f + icon + 6f;
+                string kind = def == SkillLibrary.Heal ? " " : (def.Active ? "액티브" : "패시브");
+                GUI.Label(new Rect(x + 4, ty, cw - 8, 22), kind, small);
+                GUI.Label(new Rect(x + 4, ty + 20f, cw - 8, 28), def.Name, name);
+                if (def != SkillLibrary.Heal)
+                {
+                    string pips = "";
+                    for (int p = 1; p <= def.MaxLevel; p++) pips += p <= cur ? "● " : (p == next ? "◎ " : "○ ");
+                    GUI.Label(new Rect(x + 4, ty + 48f, cw - 8, 22), pips, small);
+                }
+                GUI.Label(new Rect(x + 6, ty + 72f, cw - 12, ch - (ty - y) - 76f), (cur == 0 ? "NEW  " : "Lv." + next + "  ") + def.LevelText[next - 1], center);
+
+                if (pressed)
                 {
                     run.Pick(def);
                     break;

@@ -21,17 +21,17 @@ namespace Survivors
     {
         public static readonly EnemyDef Slime = new EnemyDef
         {
-            Name = "slime", Hp = 18f, Speed = 2.2f, Damage = 6f, Radius = 0.4f, Exp = 1f,
+            Name = "slime", Hp = 12f, Speed = 1.8f, Damage = 4f, Radius = 0.4f, Exp = 1f,
             Color = new Color(0.35f, 0.75f, 0.35f), Scale = new Vector3(0.9f, 0.7f, 0.9f), Shape = PrimitiveType.Sphere
         };
         public static readonly EnemyDef Skeleton = new EnemyDef
         {
-            Name = "skeleton", Hp = 36f, Speed = 2.8f, Damage = 9f, Radius = 0.4f, Exp = 2f,
+            Name = "skeleton", Hp = 28f, Speed = 2.3f, Damage = 7f, Radius = 0.4f, Exp = 2f,
             Color = new Color(0.88f, 0.86f, 0.75f), Scale = new Vector3(0.6f, 0.6f, 0.6f), Shape = PrimitiveType.Capsule
         };
         public static readonly EnemyDef Brute = new EnemyDef
         {
-            Name = "brute", Hp = 600f, Speed = 2.0f, Damage = 18f, Radius = 0.8f, Exp = 25f,
+            Name = "brute", Hp = 500f, Speed = 2.0f, Damage = 14f, Radius = 0.8f, Exp = 25f,
             Color = new Color(0.7f, 0.22f, 0.2f), Scale = new Vector3(1.5f, 1.5f, 1.5f), Shape = PrimitiveType.Cube
         };
     }
@@ -140,7 +140,7 @@ namespace Survivors
                 if (e.AttackCd <= 0f && dist < e.Def.Radius + Hero.Radius)
                 {
                     hero.TakeDamage(e.Def.Damage);
-                    e.AttackCd = 0.8f;
+                    e.AttackCd = 1.0f;
                 }
             }
         }

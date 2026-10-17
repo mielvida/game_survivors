@@ -6,9 +6,9 @@ namespace Survivors
     public sealed class BoltSkill : Skill
     {
         static readonly int[] Count = { 1, 1, 2, 2, 3 };
-        static readonly float[] Cooldown = { 1.0f, 0.9f, 0.9f, 0.75f, 0.7f };
-        static readonly float[] Damage = { 10f, 12f, 12f, 14f, 17f };
-        static readonly int[] Pierce = { 1, 1, 1, 2, 3 };
+        static readonly float[] Cooldown = { 0.8f, 0.75f, 0.75f, 0.65f, 0.6f };
+        static readonly float[] Damage = { 14f, 16f, 16f, 19f, 22f };
+        static readonly int[] Pierce = { 2, 2, 2, 3, 4 };
 
         const float Range = 12f;
         const float Speed = 14f;
