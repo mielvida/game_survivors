@@ -1,0 +1,341 @@
+<title>그래픽 스타일 시안</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Cinzel:wght@600&display=swap">
+<style>
+/* Layout: 4 portrait game-screen mockups in a wrapping grid, each with a short caption block. */
+:root {
+  --bg: #f3f1f6;
+  --fg: #1d1a26;
+  --muted: #6a6578;
+  --card: #ffffff;
+  --line: #dcd7e6;
+  --accent: #6b3fd4;
+  --good: #1f7a4d;
+  --bad: #a8402f;
+  --font-body: "Noto Sans KR", system-ui, sans-serif;
+  --font-display: "Cinzel", "Noto Sans KR", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14121b; --fg: #ece8f5; --muted: #a39cb8; --card: #1e1b29; --line: #332e44;
+    --accent: #a98bff; --good: #5fd397; --bad: #f08a76; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14121b; --fg: #ece8f5; --muted: #a39cb8; --card: #1e1b29; --line: #332e44;
+  --accent: #a98bff; --good: #5fd397; --bad: #f08a76; color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body);
+  padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  line-height: 1.55; font-size: 15px;
+}
+main { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-family: var(--font-display); font-size: clamp(24px, 4vw, 34px); margin: 0; letter-spacing: .02em; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 62ch; margin: 8px 0 0; }
+.note { font-size: 13px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 10px 14px; max-width: 70ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.card.rec { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.shot { background: #000; line-height: 0; }
+.shot svg { width: 100%; height: auto; display: block; max-width: 100%; }
+.body { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tag { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+h2 { margin: 0; font-size: 18px; text-wrap: balance; }
+.ref { font-size: 13px; color: var(--muted); margin: 0; }
+ul { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 3px; }
+li.p::marker { color: var(--good); content: "+ "; }
+li.m::marker { color: var(--bad); content: "− "; }
+</style>
+
+<main>
+  <header>
+    <h1>그래픽 스타일 시안</h1>
+    <p class="lead">같은 장면(기사 1명이 몬스터 무리에 둘러싸인 상태)을 네 가지 방식으로 그린 비교 이미지입니다.</p>
+  </header>
+  <p class="note">참고용으로 단순하게 그린 도식입니다. 실제 게임 아트의 완성도는 아니며, 방식별로 화면이 어떻게 다르게 보이는지를 보여주는 용도입니다.</p>
+  <section class="grid">
+    <article class="card">
+      <div class="shot" id="sA"></div>
+      <div class="body">
+        <span class="tag">A · 일러스트 (Spine)</span>
+        <h2>그린 듯한 고급 일러스트</h2>
+        <p class="ref">비슷한 게임: Hades, 수집형 RPG 영웅 화면</p>
+        <ul>
+          <li class="p">고퀄 이미지에 가장 유리</li>
+          <li class="p">장비를 입히면 외형이 바뀜</li>
+          <li class="m">적 수백 마리에는 무거움</li>
+        </ul>
+      </div>
+    </article>
+    <article class="card">
+      <div class="shot" id="sB"></div>
+      <div class="body">
+        <span class="tag">B · 도트/카툰</span>
+        <h2>작고 가벼운 픽셀 스타일</h2>
+        <p class="ref">비슷한 게임: Vampire Survivors, 브로타토</p>
+        <ul>
+          <li class="p">적이 아주 많아도 가벼움</li>
+          <li class="p">제작이 단순함</li>
+          <li class="m">장비 외형 변경이 어려움</li>
+        </ul>
+      </div>
+    </article>
+    <article class="card">
+      <div class="shot" id="sC"></div>
+      <div class="body">
+        <span class="tag">C · 3D 쿼터뷰</span>
+        <h2>입체 모델과 그림자</h2>
+        <p class="ref">비슷한 게임: 탕탕특공대</p>
+        <ul>
+          <li class="p">입체감과 조명 연출</li>
+          <li class="m">3D 모델 제작 비용이 큼</li>
+          <li class="m">모바일에서 가장 무거움</li>
+        </ul>
+      </div>
+    </article>
+    <article class="card rec">
+      <div class="shot" id="sD"></div>
+      <div class="body">
+        <span class="tag">A+B · 혼합 (권장)</span>
+        <h2>영웅은 일러스트, 몬스터는 가볍게</h2>
+        <p class="ref">영웅·보스는 A, 일반 몬스터는 B</p>
+        <ul>
+          <li class="p">영웅 퀄리티와 장비 변경 유지</li>
+          <li class="p">몬스터 수백 마리도 부드러움</li>
+          <li class="m">두 스타일의 톤을 맞춰야 함</li>
+        </ul>
+      </div>
+    </article>
+  </section>
+</main>
+
+<script>
+(function () {
+  var W = 300, H = 420, CX = 150, CY = 235;
+
+  function rng(seed) {
+    var s = seed;
+    return function () { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  }
+
+  // Enemy positions on a ring around the hero, nearest ones lower on screen drawn last.
+  function spots(n, seed) {
+    var r = rng(seed), out = [];
+    for (var i = 0; i < n; i++) {
+      var a = r() * Math.PI * 2, d = 48 + r() * 140;
+      var x = CX + Math.cos(a) * d * 1.0, y = CY + Math.sin(a) * d * 1.15;
+      if (x < 14 || x > W - 14 || y < 40 || y > H - 20) continue;
+      out.push({ x: x, y: y, k: r() });
+    }
+    out.sort(function (p, q) { return p.y - q.y; });
+    return out;
+  }
+
+  // ---------- pixel sprites ----------
+  var PAL = { g: '#58c25a', d: '#2f7d3a', w: '#fff', k: '#161616', p: '#8a4fd6', q: '#4c2a82', r: '#ff4d4d',
+              h: '#aeb8c8', s: '#f0c7a0', b: '#3b63c9', y: '#f5c542', c: '#c23b3b', n: '#6b4a2b' };
+  var SLIME = ['..gggg..', '.gggggg.', 'gwkggwkg', 'gggggggg', 'gdggggdg', '.dddddd.'];
+  var BAT = ['p.......p', 'pp.ppp.pp', 'ppppppppp', 'pprpprpp.', '.pp.p.pp.', '..p...p..'];
+  var HERO = ['...ccc....', '..hhhhh...', '..hhhhh...', '..hsssh...', '..sksks...', '.bbbbbbb..', 'sbbyybbbs.', 'sbbbbbbbs.', '.bb...bb..', '.nn...nn..'];
+
+  function sprite(map, x, y, s) {
+    var out = '';
+    for (var j = 0; j < map.length; j++) {
+      var row = map[j], i = 0;
+      while (i < row.length) {
+        var ch = row[i];
+        if (ch === '.') { i++; continue; }
+        var k = i;
+        while (k < row.length && row[k] === ch) k++;
+        out += '<rect x="' + (x + i * s) + '" y="' + (y + j * s) + '" width="' + ((k - i) * s) + '" height="' + s + '" fill="' + PAL[ch] + '"/>';
+        i = k;
+      }
+    }
+    return out;
+  }
+
+  // ---------- A: painterly pieces ----------
+  var defsA = '<defs>' +
+    '<radialGradient id="bgA" cx="50%" cy="55%" r="75%"><stop offset="0" stop-color="#3f5b57"/><stop offset=".6" stop-color="#26323f"/><stop offset="1" stop-color="#120f1d"/></radialGradient>' +
+    '<linearGradient id="armA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dfe8f3"/><stop offset=".5" stop-color="#8fa3c0"/><stop offset="1" stop-color="#4a5a7c"/></linearGradient>' +
+    '<linearGradient id="capeA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3283b"/><stop offset="1" stop-color="#5a1226"/></linearGradient>' +
+    '<radialGradient id="slA" cx="38%" cy="30%" r="75%"><stop offset="0" stop-color="#b9f7a0"/><stop offset=".55" stop-color="#4fb35b"/><stop offset="1" stop-color="#1f5b3a"/></radialGradient>' +
+    '<radialGradient id="btA" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#c9a2ff"/><stop offset=".6" stop-color="#7a45c8"/><stop offset="1" stop-color="#35185e"/></radialGradient>' +
+    '<radialGradient id="orbA"><stop offset="0" stop-color="#fff6c8"/><stop offset=".4" stop-color="#ffcf5a"/><stop offset="1" stop-color="#ffcf5a" stop-opacity="0"/></radialGradient>' +
+    '<filter id="blurA"><feGaussianBlur stdDeviation="3.2"/></filter>' +
+    '</defs>';
+
+  function bgA() {
+    var s = '<rect width="' + W + '" height="' + H + '" fill="url(#bgA)"/>';
+    var r = rng(7);
+    for (var i = 0; i < 26; i++) { // fallen leaves / moss strokes
+      var x = r() * W, y = 60 + r() * (H - 80);
+      s += '<ellipse cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" rx="' + (6 + r() * 12).toFixed(1) + '" ry="' + (2 + r() * 4).toFixed(1) + '" fill="#58a07a" opacity="' + (0.08 + r() * 0.1).toFixed(2) + '"/>';
+    }
+    for (var t = 0; t < 5; t++) { // distant trunks
+      var tx = 20 + t * 62 + (t % 2) * 10;
+      s += '<rect x="' + tx + '" y="0" width="' + (14 + (t % 3) * 5) + '" height="150" fill="#0d1620" opacity=".55"/>';
+    }
+    return s;
+  }
+
+  function heroA(x, y, sc) {
+    return '<g transform="translate(' + x + ',' + y + ') scale(' + sc + ')">' +
+      '<ellipse cx="0" cy="38" rx="26" ry="8" fill="#000" opacity=".4"/>' +
+      '<path d="M-20 -8 Q-34 22 -24 40 L26 40 Q34 22 20 -8 Z" fill="url(#capeA)"/>' +
+      '<rect x="-14" y="-10" width="28" height="36" rx="10" fill="url(#armA)" stroke="#2b3550" stroke-width="1.2"/>' +
+      '<rect x="-17" y="-8" width="9" height="12" rx="4" fill="#cfd9e8" stroke="#2b3550" stroke-width="1"/>' +
+      '<rect x="8" y="-8" width="9" height="12" rx="4" fill="#cfd9e8" stroke="#2b3550" stroke-width="1"/>' +
+      '<rect x="-4" y="6" width="8" height="5" rx="2" fill="#e0b84a"/>' +
+      '<circle cx="0" cy="-22" r="13" fill="url(#armA)" stroke="#2b3550" stroke-width="1.2"/>' +
+      '<rect x="-8" y="-25" width="16" height="4" rx="2" fill="#10151f"/>' +
+      '<path d="M0 -36 Q8 -44 14 -34 Q6 -34 0 -36Z" fill="#b3283b"/>' +
+      '<g transform="translate(24,2) rotate(28)"><rect x="-2.5" y="-34" width="5" height="40" rx="2" fill="#eef4ff" stroke="#6a7da0" stroke-width=".8"/><rect x="-8" y="5" width="16" height="4" rx="2" fill="#e0b84a"/><rect x="-5" y="-34" width="10" height="40" fill="#9fd0ff" opacity=".35" filter="url(#blurA)"/></g>' +
+      '</g>';
+  }
+
+  function ringA() {
+    return '<ellipse cx="' + CX + '" cy="' + (CY + 30) + '" rx="86" ry="46" fill="none" stroke="#ffcf5a" stroke-width="5" opacity=".6" filter="url(#blurA)"/>' +
+           '<ellipse cx="' + CX + '" cy="' + (CY + 30) + '" rx="86" ry="46" fill="none" stroke="#ffe9a3" stroke-width="1.4" opacity=".9"/>';
+  }
+
+  function orbsA() {
+    var s = '';
+    for (var i = 0; i < 6; i++) {
+      var a = i / 6 * Math.PI * 2 + 0.4;
+      s += '<circle cx="' + (CX + Math.cos(a) * 86).toFixed(1) + '" cy="' + (CY + 30 + Math.sin(a) * 46).toFixed(1) + '" r="9" fill="url(#orbA)"/>';
+    }
+    return s;
+  }
+
+  function enemyA(e) {
+    var sc = 0.85 + e.k * 0.5;
+    if (e.k > 0.5) {
+      return '<g transform="translate(' + e.x.toFixed(1) + ',' + e.y.toFixed(1) + ') scale(' + sc.toFixed(2) + ')"><ellipse cy="14" rx="14" ry="4" fill="#000" opacity=".35"/><path d="M-15 12 Q-18 -14 0 -16 Q18 -14 15 12 Z" fill="url(#slA)" stroke="#173d28" stroke-width="1"/><ellipse cx="-5" cy="-3" rx="2.6" ry="3.6" fill="#fff"/><ellipse cx="6" cy="-3" rx="2.6" ry="3.6" fill="#fff"/><circle cx="-4.5" cy="-2.5" r="1.4" fill="#111"/><circle cx="6.5" cy="-2.5" r="1.4" fill="#111"/><ellipse cx="-6" cy="-10" rx="4" ry="2" fill="#fff" opacity=".5"/></g>';
+    }
+    return '<g transform="translate(' + e.x.toFixed(1) + ',' + e.y.toFixed(1) + ') scale(' + sc.toFixed(2) + ')"><ellipse cy="16" rx="12" ry="3.5" fill="#000" opacity=".3"/><path d="M-6 -2 Q-26 -16 -30 4 Q-18 0 -10 8 Z" fill="url(#btA)" stroke="#220f3d" stroke-width="1"/><path d="M6 -2 Q26 -16 30 4 Q18 0 10 8 Z" fill="url(#btA)" stroke="#220f3d" stroke-width="1"/><ellipse cy="0" rx="9" ry="11" fill="url(#btA)" stroke="#220f3d" stroke-width="1"/><circle cx="-3.5" cy="-2" r="2" fill="#ff6a6a"/><circle cx="3.5" cy="-2" r="2" fill="#ff6a6a"/></g>';
+  }
+
+  // ---------- B: pixel pieces ----------
+  function bgB() {
+    var s = '<rect width="' + W + '" height="' + H + '" fill="#3a7a3f"/>';
+    for (var y = 0; y < H; y += 20) for (var x = 0; x < W; x += 20) {
+      if (((x + y) / 20) % 2 === 0) s += '<rect x="' + x + '" y="' + y + '" width="20" height="20" fill="#43884a"/>';
+    }
+    var r = rng(11);
+    for (var i = 0; i < 40; i++) {
+      var gx = Math.floor(r() * 15) * 20 + 8, gy = Math.floor(r() * 21) * 20 + 6;
+      s += '<rect x="' + gx + '" y="' + gy + '" width="4" height="4" fill="#2e6b35"/>';
+    }
+    return s;
+  }
+  function enemyB(e) {
+    var x = Math.round(e.x / 3) * 3, y = Math.round(e.y / 3) * 3;
+    return e.k > 0.5 ? sprite(SLIME, x - 12, y - 9, 3) : sprite(BAT, x - 13, y - 9, 3);
+  }
+  function shotsB() {
+    var s = '';
+    for (var i = 0; i < 8; i++) {
+      var a = i / 8 * Math.PI * 2;
+      var x = Math.round((CX + Math.cos(a) * 62) / 4) * 4, y = Math.round((CY + 20 + Math.sin(a) * 62) / 4) * 4;
+      s += '<rect x="' + x + '" y="' + y + '" width="8" height="8" fill="#ffe36b"/><rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="4" height="4" fill="#fff"/>';
+    }
+    return s;
+  }
+
+  // ---------- C: low-poly 3D pieces ----------
+  function bgC() {
+    var s = '<rect width="' + W + '" height="' + H + '" fill="#1b2230"/>';
+    var tw = 60, th = 30;
+    for (var j = -2; j < 20; j++) for (var i = -2; i < 8; i++) {
+      var x = i * tw + (j % 2 ? tw / 2 : 0), y = j * th / 2 + 20;
+      var shade = ((i + j) % 3 === 0) ? '#27324a' : (((i + j) % 3 === 1) ? '#222c42' : '#2b3752');
+      s += '<polygon points="' + x + ',' + (y - th / 2) + ' ' + (x + tw / 2) + ',' + y + ' ' + x + ',' + (y + th / 2) + ' ' + (x - tw / 2) + ',' + y + '" fill="' + shade + '" stroke="#1a2132" stroke-width="1"/>';
+    }
+    return s + '<rect width="' + W + '" height="' + H + '" fill="url(#vigC)"/>';
+  }
+  var defsC = '<defs><radialGradient id="vigC" cx="50%" cy="55%" r="75%"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient></defs>';
+
+  function heroC(x, y) {
+    return '<g transform="translate(' + x + ',' + y + ')">' +
+      '<ellipse cx="0" cy="30" rx="24" ry="10" fill="#000" opacity=".45"/>' +
+      '<polygon points="-16,-6 0,2 0,32 -16,24" fill="#4468b0"/>' +
+      '<polygon points="0,2 16,-6 16,24 0,32" fill="#2e4880"/>' +
+      '<polygon points="-16,-6 0,-14 16,-6 0,2" fill="#7c9be0"/>' +
+      '<polygon points="-10,-18 0,-26 10,-18 0,-10" fill="#e9eef8"/>' +
+      '<polygon points="-10,-18 0,-10 0,-2 -10,-10" fill="#c3cde0"/>' +
+      '<polygon points="10,-18 0,-10 0,-2 10,-10" fill="#97a5c4"/>' +
+      '<polygon points="-4,-24 0,-34 4,-24" fill="#d94b4b"/>' +
+      '<polygon points="20,-2 26,-2 26,-34 23,-40 20,-34" fill="#f3f6ff"/>' +
+      '<polygon points="26,-2 29,-4 29,-34 26,-34" fill="#aeb9d6"/>' +
+      '</g>';
+  }
+  function ringC() {
+    return '<ellipse cx="' + CX + '" cy="' + (CY + 30) + '" rx="84" ry="42" fill="#ffd45a" fill-opacity=".10" stroke="#ffd45a" stroke-width="2.2" stroke-opacity=".85"/>';
+  }
+  function enemyC(e) {
+    var x = e.x.toFixed(1), y = e.y.toFixed(1), sc = (0.8 + e.k * 0.45).toFixed(2);
+    if (e.k > 0.5) { // cube
+      return '<g transform="translate(' + x + ',' + y + ') scale(' + sc + ')"><ellipse cy="14" rx="14" ry="5" fill="#000" opacity=".4"/><polygon points="0,-14 13,-7 0,0 -13,-7" fill="#a6e07a"/><polygon points="-13,-7 0,0 0,14 -13,7" fill="#6aa84a"/><polygon points="13,-7 0,0 0,14 13,7" fill="#467a32"/><rect x="-8" y="-1" width="3" height="3" fill="#111"/><rect x="3" y="3" width="3" height="3" fill="#111"/></g>';
+    }
+    return '<g transform="translate(' + x + ',' + y + ') scale(' + sc + ')"><ellipse cy="14" rx="12" ry="4" fill="#000" opacity=".4"/><polygon points="0,-18 12,6 0,12 -12,6" fill="#b678ff"/><polygon points="0,-18 12,6 0,12" fill="#7d3fd0"/><polygon points="-12,6 0,12 0,2" fill="#5a2aa0"/><rect x="-5" y="-2" width="3" height="3" fill="#ff7a7a"/><rect x="2" y="-2" width="3" height="3" fill="#ff7a7a"/></g>';
+  }
+  function orbsC() {
+    var s = '';
+    for (var i = 0; i < 6; i++) {
+      var a = i / 6 * Math.PI * 2 + 0.4;
+      var x = CX + Math.cos(a) * 84, y = CY + 30 + Math.sin(a) * 42;
+      s += '<ellipse cx="' + x.toFixed(1) + '" cy="' + (y + 10).toFixed(1) + '" rx="6" ry="2.4" fill="#000" opacity=".4"/><polygon points="' + x.toFixed(1) + ',' + (y - 8).toFixed(1) + ' ' + (x + 6).toFixed(1) + ',' + y.toFixed(1) + ' ' + x.toFixed(1) + ',' + (y + 8).toFixed(1) + ' ' + (x - 6).toFixed(1) + ',' + y.toFixed(1) + '" fill="#ffe08a" stroke="#fff3c4" stroke-width="1"/>';
+    }
+    return s;
+  }
+
+  // ---------- HUD (shared) ----------
+  function hud() {
+    return '<rect x="12" y="12" width="276" height="9" rx="4.5" fill="#000" opacity=".55"/><rect x="13" y="13" width="168" height="7" rx="3.5" fill="#5ab0ff"/>' +
+      '<text x="150" y="38" fill="#fff" font-size="11" font-family="sans-serif" text-anchor="middle" opacity=".9">02:41</text>' +
+      '<circle cx="64" cy="388" r="26" fill="#fff" opacity=".10" stroke="#fff" stroke-opacity=".35"/><circle cx="64" cy="388" r="11" fill="#fff" opacity=".35"/>';
+  }
+
+  function svg(inner) {
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img">' + inner + '</svg>';
+  }
+
+  function sceneA() {
+    var s = defsA + bgA() + ringA();
+    var es = spots(15, 3); var drawn = false;
+    es.forEach(function (e) { if (!drawn && e.y > CY) { s += heroA(CX, CY, 1); drawn = true; } s += enemyA(e); });
+    if (!drawn) s += heroA(CX, CY, 1);
+    return svg(s + orbsA() + hud());
+  }
+  function sceneB() {
+    var s = bgB(), es = spots(44, 5), drawn = false;
+    es.forEach(function (e) { if (!drawn && e.y > CY) { s += sprite(HERO, CX - 25, CY - 30, 5); drawn = true; } s += enemyB(e); });
+    if (!drawn) s += sprite(HERO, CX - 25, CY - 30, 5);
+    return svg('<g shape-rendering="crispEdges">' + s + shotsB() + '</g>' + hud());
+  }
+  function sceneC() {
+    var s = defsC + bgC() + ringC(), es = spots(15, 9), drawn = false;
+    es.forEach(function (e) { if (!drawn && e.y > CY) { s += heroC(CX, CY); drawn = true; } s += enemyC(e); });
+    if (!drawn) s += heroC(CX, CY);
+    return svg(s + orbsC() + hud());
+  }
+  function sceneD() {
+    var s = defsA + bgA() + ringA(), es = spots(40, 5), drawn = false;
+    es.forEach(function (e) {
+      if (!drawn && e.y > CY) { s += heroA(CX, CY, 1); drawn = true; }
+      s += '<g shape-rendering="crispEdges">' + enemyB(e) + '</g>';
+    });
+    if (!drawn) s += heroA(CX, CY, 1);
+    return svg(s + orbsA() + hud());
+  }
+
+  document.getElementById('sA').innerHTML = sceneA();
+  document.getElementById('sB').innerHTML = sceneB();
+  document.getElementById('sC').innerHTML = sceneC();
+  document.getElementById('sD').innerHTML = sceneD();
+})();
+</script>
