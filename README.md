@@ -10,3 +10,6 @@
 ## 문서
 - [게임 기획서 (GDD)](docs/GDD.md)
 - [기술 설계서](docs/TECH_DESIGN.md)
+
+## 프로토타입
+- [M0 프로토타입 실행 가이드](docs/PROTOTYPE.md) — Unity 6, 3D 쿼터뷰
