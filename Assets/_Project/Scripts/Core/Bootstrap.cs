@@ -94,7 +94,7 @@ namespace Survivors
         }
     }
 
-    // Static square arena: checkerboard floor surrounded by a rough stone wall.
+    // Static square arena: checkerboard floor closed in by a natural thicket of bushes, boulders and trees.
     public static class ArenaBuilder
     {
         const float Period = 8f; // metres per full 2x2 checker repeat
@@ -124,67 +124,38 @@ namespace Survivors
             mat.mainTextureScale = new Vector2(size / Period, size / Period);
             g.GetComponent<Renderer>().sharedMaterial = mat;
 
-            // Stone wall: dark mortar core, three rows of staggered blocks, corner towers with torches.
+            // Natural boundary: bushes and boulders hug the edge, trees stand behind them.
             var rng = new System.Random(7);
-            var stone = new[]
-            {
-                new Color(0.47f, 0.45f, 0.44f), new Color(0.52f, 0.51f, 0.48f), new Color(0.42f, 0.41f, 0.38f),
-                new Color(0.55f, 0.54f, 0.51f), new Color(0.44f, 0.42f, 0.40f)
-            };
-            var moss = new Color(0.29f, 0.54f, 0.30f);
+            var rock = new[] { new Color(0.47f, 0.45f, 0.44f), new Color(0.52f, 0.51f, 0.48f), new Color(0.42f, 0.41f, 0.38f) };
+            var leaf = new[] { new Color(0.18f, 0.42f, 0.24f), new Color(0.23f, 0.49f, 0.27f), new Color(0.16f, 0.36f, 0.22f) };
+            var pine = new[] { new Color(0.12f, 0.30f, 0.22f), new Color(0.16f, 0.38f, 0.25f), new Color(0.18f, 0.45f, 0.29f) };
+            var trunk = new Color(0.42f, 0.29f, 0.17f);
+
             for (int side = 0; side < 4; side++)
             {
                 bool alongX = side < 2;
                 float sign = (side % 2 == 0) ? -1f : 1f;
-                float hs = (side == 1) ? 0.6f : 1f; // the near wall stays lower so the hero is not hidden
-                float edge = sign * (half + 0.55f);
-                float total = size + 4f;
+                bool near = side == 1; // bottom of the screen: keep things low so the hero stays visible
 
-                var core = Visuals.Prim(PrimitiveType.Cube, new Color(0.18f, 0.17f, 0.16f), alongX ? new Vector3(total, 1.9f * hs, 1f) : new Vector3(1f, 1.9f * hs, total), parent);
-                core.transform.position = alongX ? new Vector3(0f, 0.95f * hs, edge) : new Vector3(edge, 0.95f * hs, 0f);
-
-                for (int row = 0; row < 3; row++)
+                for (float k = -half - 3f; k <= half + 3f; k += 1.15f)
                 {
-                    float k = -half - 2f + (row % 2) * 0.8f;
-                    while (k < half + 2f)
-                    {
-                        float len = 1.2f + (float)rng.NextDouble() * 1.3f;
-                        float bh = (0.58f + (float)rng.NextDouble() * 0.12f) * hs;
-                        float depth = 1.05f + (float)rng.NextDouble() * 0.3f;
-                        float yc = (row * 0.64f + 0.32f) * hs;
-                        float along = k + len / 2f;
-                        var blk = Visuals.Prim(PrimitiveType.Cube, stone[rng.Next(stone.Length)],
-                            alongX ? new Vector3(len - 0.07f, bh - 0.05f, depth) : new Vector3(depth, bh - 0.05f, len - 0.07f), parent);
-                        blk.transform.position = alongX ? new Vector3(along, yc, edge) : new Vector3(edge, yc, along);
-                        blk.transform.rotation = Quaternion.Euler(0f, ((float)rng.NextDouble() - 0.5f) * 3f, 0f);
-                        if (row == 2 && rng.NextDouble() < 0.5)
-                        {
-                            var m = Visuals.Prim(PrimitiveType.Sphere, moss, new Vector3(0.9f, 0.25f, 0.7f), parent);
-                            m.transform.position = blk.transform.position + new Vector3(0f, bh * 0.5f, 0f);
-                        }
-                        k += len;
-                    }
+                    float sc = 0.8f + (float)rng.NextDouble() * 0.6f;
+                    float off = half + 1f + (float)rng.NextDouble() * 0.8f;
+                    float along = k + (float)rng.NextDouble() * 0.6f;
+                    var scale = new Vector3(sc * 2.2f, sc * (near ? 1.4f : 2.0f), sc * 2.2f);
+                    bool isRock = rng.NextDouble() < 0.42;
+                    var blob = Visuals.Prim(PrimitiveType.Sphere, isRock ? rock[rng.Next(rock.Length)] : leaf[rng.Next(leaf.Length)], scale, parent);
+                    blob.transform.position = EdgePoint(alongX, sign, along, off, scale.y * 0.4f);
                 }
+
+                for (float k = -half - 4f; k <= half + 4f; k += 2.1f)
+                    Tree(parent, rng, pine, trunk, EdgePoint(alongX, sign, k + (float)rng.NextDouble() * 1.2f, half + (near ? 4f : 3f) + (float)rng.NextDouble() * 2.2f, 0f));
+
+                for (float k = -half - 10f; k <= half + 10f; k += 4f)
+                    Tree(parent, rng, pine, trunk, EdgePoint(alongX, sign, k + (float)rng.NextDouble() * 2f, half + 6f + (float)rng.NextDouble() * 24f, 0f));
             }
 
-            for (int sx = -1; sx <= 1; sx += 2)
-                for (int sz = -1; sz <= 1; sz += 2)
-                {
-                    float cx = sx * (half + 0.6f), cz = sz * (half + 0.6f);
-                    for (int t = 0; t < 4; t++)
-                    {
-                        float w = 2.3f - t * 0.12f;
-                        var tb = Visuals.Prim(PrimitiveType.Cube, stone[(t + 2) % stone.Length], new Vector3(w, 0.6f, w), parent);
-                        tb.transform.position = new Vector3(cx, 0.45f + t * 0.62f, cz);
-                        tb.transform.rotation = Quaternion.Euler(0f, t * 7f, 0f);
-                    }
-                    var cap = Visuals.Prim(PrimitiveType.Cube, new Color(0.29f, 0.28f, 0.26f), new Vector3(2f, 0.3f, 2f), parent);
-                    cap.transform.position = new Vector3(cx, 3.0f, cz);
-                    var flame = Visuals.Prim(PrimitiveType.Sphere, new Color(1f, 0.65f, 0.24f), new Vector3(0.7f, 0.9f, 0.7f), parent);
-                    flame.transform.position = new Vector3(cx, 3.7f, cz);
-                }
-
-            // Dark forest floor beyond the wall.
+            // Dark forest floor beyond the thicket.
             var outer = GameObject.CreatePrimitive(PrimitiveType.Plane);
             var oc = outer.GetComponent<Collider>();
             if (oc != null) Object.Destroy(oc);
@@ -194,10 +165,20 @@ namespace Survivors
             outer.GetComponent<Renderer>().sharedMaterial = Visuals.Mat(new Color(0.08f, 0.13f, 0.1f));
         }
 
-        static void Wall(Transform parent, Color c, Vector3 pos, Vector3 scale)
+        static Vector3 EdgePoint(bool alongX, float sign, float along, float off, float y)
         {
-            var w = Visuals.Prim(PrimitiveType.Cube, c, scale, parent);
-            w.transform.position = pos;
+            return alongX ? new Vector3(along, y, sign * off) : new Vector3(sign * off, y, along);
+        }
+
+        static void Tree(Transform parent, System.Random rng, Color[] canopy, Color trunk, Vector3 pos)
+        {
+            float t = 1f + (float)rng.NextDouble() * 0.9f;
+            var stem = Visuals.Prim(PrimitiveType.Cylinder, trunk, new Vector3(0.45f * t, 0.7f * t, 0.45f * t), parent);
+            stem.transform.position = pos + new Vector3(0f, 0.7f * t, 0f);
+            var low = Visuals.Prim(PrimitiveType.Sphere, canopy[rng.Next(canopy.Length)], new Vector3(2.4f * t, 2.2f * t, 2.4f * t), parent);
+            low.transform.position = pos + new Vector3(0f, 1.9f * t, 0f);
+            var top = Visuals.Prim(PrimitiveType.Sphere, canopy[rng.Next(canopy.Length)], new Vector3(1.6f * t, 2.0f * t, 1.6f * t), parent);
+            top.transform.position = pos + new Vector3(0f, 3.5f * t, 0f);
         }
     }
 }
