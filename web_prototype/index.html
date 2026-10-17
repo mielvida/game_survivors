@@ -93,7 +93,7 @@ body {
   if (!window.THREE) { errBox.textContent = '3D 라이브러리를 불러오지 못했습니다.'; return; }
 
   // ---------- config & data (mirrors the Unity prototype) ----------
-  var CFG = { max: 200, spawnR: 26, pitch: 55 * Math.PI / 180, dist: 44, fov: 40, elite: 150, maxActive: 4, maxPassive: 4 };
+  var CFG = { max: 200, spawnR: 26, pitch: 55 * Math.PI / 180, dist: 44, fov: 40, bound: 28, maxActive: 4, maxPassive: 4 };
   var expReq = function (l) { return 2 + 2 * l + Math.floor(l * l / 4); };
 
   var ENEMY = {
@@ -126,6 +126,7 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
   var SKILL_IDS = ['bolt', 'orbit', 'pulse', 'might', 'haste', 'boots', 'magnet', 'vital'];
   var BOLT = { count: [1, 1, 2, 2, 3], cd: [0.9, 0.85, 0.85, 0.7, 0.65], dmg: [14, 16, 16, 19, 22], pierce: [1, 1, 1, 2, 3] };
   var ORBIT = { count: [2, 2, 3, 3, 4], dmg: [6, 8, 8, 10, 12] };
+  var ORBIT_R = 3.2;
   var PULSE = { interval: [3, 3, 2.5, 2.5, 1.8], radius: [3, 3.5, 3.5, 3.5, 5], dmg: [12, 15, 18, 24, 28] };
 
   // ---------- three.js scene ----------
@@ -152,63 +153,223 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
   window.addEventListener('resize', resize);
   resize();
 
-  // ground: checker texture, plane snaps to the hero in whole periods so it looks endless
-  var PLANE = 176, PERIOD = 8;
-  var gc = document.createElement('canvas'); gc.width = gc.height = 2;
-  var gx = gc.getContext('2d');
-  var cA = '#29443a', cB = '#30503f';
-  gx.fillStyle = cA; gx.fillRect(0, 0, 1, 1); gx.fillRect(1, 1, 1, 1);
-  gx.fillStyle = cB; gx.fillRect(1, 0, 1, 1); gx.fillRect(0, 1, 1, 1);
-  var gtex = new THREE.CanvasTexture(gc);
-  gtex.magFilter = THREE.NearestFilter; gtex.minFilter = THREE.NearestFilter;
-  gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
-  gtex.repeat.set(PLANE / PERIOD, PLANE / PERIOD);
-  var ground = new THREE.Mesh(new THREE.PlaneGeometry(PLANE, PLANE), new THREE.MeshLambertMaterial({ map: gtex }));
+  // ---------- painted look: everything below is generated in code ----------
+  var B = CFG.bound;
+  var TAU = Math.PI * 2;
+  var _seed = 12345;
+  function rnd() { _seed = (_seed * 16807) % 2147483647; return _seed / 2147483647; }
+
+  function P(g, c, x, y, z, sx, sy, sz, ry, rz) {
+    var m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry || 0, rz || 0)), new THREE.Vector3(sx || 1, sy || 1, sz || 1));
+    return { g: g, c: c, m: m };
+  }
+  function mergeParts(parts) {
+    var pos = [], nor = [], col = [];
+    parts.forEach(function (p) {
+      var g = p.g.toNonIndexed(); g.applyMatrix4(p.m);
+      var pa = g.attributes.position.array, na = g.attributes.normal.array, c = new THREE.Color(p.c);
+      for (var i = 0; i < pa.length; i++) { pos.push(pa[i]); nor.push(na[i]); }
+      for (var k = 0; k < pa.length / 3; k++) col.push(c.r, c.g, c.b);
+    });
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return geo;
+  }
+  var SPH = new THREE.SphereGeometry(1, 10, 8), BOX = new THREE.BoxGeometry(1, 1, 1), CYL = new THREE.CylinderGeometry(1, 1, 1, 10),
+      CONE = new THREE.ConeGeometry(1, 1, 7), ICO = new THREE.IcosahedronGeometry(1, 0);
+  var vcMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+  // ground: hand-painted style tile (canvas), seamless, stretched over the arena
+  function paintGround() {
+    var N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+    var x = c.getContext('2d');
+    x.fillStyle = '#2e5139'; x.fillRect(0, 0, N, N);
+    function wrap(fn, px, py, r) {
+      for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) {
+        var ox = px + dx * N, oy = py + dy * N;
+        if (ox > -r - 2 && ox < N + r + 2 && oy > -r - 2 && oy < N + r + 2) fn(ox, oy);
+      }
+    }
+    var i, px, py;
+    for (i = 0; i < 26; i++) { // soft colour patches
+      px = rnd() * N; py = rnd() * N; var pr = 30 + rnd() * 50, dark = rnd() < 0.5;
+      wrap(function (ox, oy) {
+        var g = x.createRadialGradient(ox, oy, 0, ox, oy, pr);
+        g.addColorStop(0, dark ? 'rgba(18,44,32,.32)' : 'rgba(96,150,84,.26)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = g; x.fillRect(ox - pr, oy - pr, pr * 2, pr * 2);
+      }, px, py, pr);
+    }
+    for (i = 0; i < 3200; i++) { // speckle
+      px = rnd() * N; py = rnd() * N;
+      x.fillStyle = rnd() < 0.5 ? 'rgba(120,175,100,.35)' : 'rgba(20,50,35,.4)';
+      x.fillRect(px, py, 1 + (rnd() < 0.3 ? 1 : 0), 1);
+    }
+    x.lineCap = 'round';
+    for (i = 0; i < 520; i++) { // grass blades
+      px = rnd() * N; py = rnd() * N; var len = 3 + rnd() * 5, lean = (rnd() - 0.5) * 3;
+      x.strokeStyle = rnd() < 0.5 ? 'rgba(140,200,110,.55)' : 'rgba(70,120,70,.6)'; x.lineWidth = 1;
+      wrap(function (ox, oy) { x.beginPath(); x.moveTo(ox, oy); x.lineTo(ox + lean, oy - len); x.stroke(); }, px, py, 8);
+    }
+    for (i = 0; i < 9; i++) { // pebbles
+      px = rnd() * N; py = rnd() * N; var sr = 3 + rnd() * 3;
+      wrap(function (ox, oy) {
+        x.fillStyle = 'rgba(0,0,0,.25)'; x.beginPath(); x.ellipse(ox + 1, oy + 2, sr, sr * 0.6, 0, 0, TAU); x.fill();
+        x.fillStyle = '#8c9187'; x.beginPath(); x.ellipse(ox, oy, sr, sr * 0.7, 0, 0, TAU); x.fill();
+        x.fillStyle = 'rgba(255,255,255,.25)'; x.beginPath(); x.ellipse(ox - sr * 0.3, oy - sr * 0.3, sr * 0.4, sr * 0.25, 0, 0, TAU); x.fill();
+      }, px, py, sr + 3);
+    }
+    var fl = ['#f5a3c0', '#ffe27a', '#ffffff', '#b9a6ff'];
+    for (i = 0; i < 34; i++) { // flowers
+      px = rnd() * N; py = rnd() * N; var fc = fl[Math.floor(rnd() * fl.length)];
+      wrap(function (ox, oy) { x.fillStyle = fc; x.fillRect(ox - 1, oy - 1, 3, 3); x.fillStyle = '#ffd24a'; x.fillRect(ox, oy, 1, 1); }, px, py, 3);
+    }
+    var t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+    t.repeat.set(2 * B / 8, 2 * B / 8);
+    return t;
+  }
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(2 * B, 2 * B), new THREE.MeshLambertMaterial({ map: paintGround() }));
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  // hero
+  // arena walls, corner pillars with torches, trees outside
+  (function buildArena() {
+    var parts = [], glow = [], L = 2 * B + 3;
+    [[0, -B - 0.5, 1], [0, B + 0.5, 1], [-B - 0.5, 0, 0], [B + 0.5, 0, 0]].forEach(function (w) {
+      var alongX = w[2] === 1;
+      parts.push(P(BOX, 0x7d838b, w[0], 0.35, w[1], alongX ? L : 1, 0.7, alongX ? 1 : L));
+      parts.push(P(BOX, 0xa4aab2, w[0], 0.78, w[1], alongX ? L : 1.3, 0.16, alongX ? 1.3 : L));
+      for (var k = -B + 4; k < B; k += 8) {
+        parts.push(P(BOX, 0x686e76, alongX ? k : w[0], 0.55, alongX ? w[1] : k, alongX ? 1.1 : 1.5, 1.1, alongX ? 1.5 : 1.1));
+      }
+    });
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (c) {
+      var cx = c[0] * (B + 0.5), cz = c[1] * (B + 0.5);
+      parts.push(P(BOX, 0x5d636b, cx, 1.8, cz, 2, 3.6, 2));
+      parts.push(P(BOX, 0x9aa1aa, cx, 3.7, cz, 2.4, 0.3, 2.4));
+      glow.push(P(SPH, 0xffa63d, cx, 4.3, cz, 0.55, 0.55, 0.55));
+      glow.push(P(SPH, 0xffe3a0, cx, 4.3, cz, 0.3, 0.3, 0.3));
+    });
+    scene.add(new THREE.Mesh(mergeParts(parts), vcMat));
+    scene.add(new THREE.Mesh(mergeParts(glow), new THREE.MeshBasicMaterial({ vertexColors: true })));
+
+    // trees (instanced, outside the walls)
+    var tree = mergeParts([P(CYL, 0x6b4a2b, 0, 0.7, 0, 0.22, 1.4, 0.22), P(CONE, 0x1f4d37, 0, 1.9, 0, 1.2, 1.7, 1.2),
+      P(CONE, 0x28603f, 0, 2.9, 0, 0.95, 1.5, 0.95), P(CONE, 0x2f7249, 0, 3.8, 0, 0.65, 1.3, 0.65)]);
+    var N = 110, trees = new THREE.InstancedMesh(tree, vcMat, N), d = new THREE.Object3D();
+    for (var i = 0; i < N; i++) {
+      var side = Math.floor(rnd() * 4), off = B + 3 + rnd() * 22, along = (rnd() * 2 - 1) * (B + 24);
+      var tx = side < 2 ? along : (side === 2 ? -off : off), tz = side < 2 ? (side === 0 ? -off : off) : along;
+      var sc = 0.9 + rnd() * 1.1;
+      d.position.set(tx, 0, tz); d.rotation.set(0, rnd() * TAU, 0); d.scale.set(sc, sc * (0.9 + rnd() * 0.4), sc); d.updateMatrix();
+      trees.setMatrixAt(i, d.matrix);
+    }
+    scene.add(trees);
+
+    // grass tufts and rocks inside the arena (decoration only, no collision)
+    var tuft = mergeParts([P(CONE, 0x3f7d46, -0.1, 0.2, 0, 0.08, 0.45, 0.08, 0, 0.25), P(CONE, 0x56995a, 0.05, 0.25, 0.05, 0.08, 0.55, 0.08), P(CONE, 0x3f7d46, 0.15, 0.2, -0.03, 0.08, 0.42, 0.08, 0, -0.3)]);
+    var T = 260, tufts = new THREE.InstancedMesh(tuft, vcMat, T);
+    for (i = 0; i < T; i++) {
+      d.position.set((rnd() * 2 - 1) * (B - 1), 0, (rnd() * 2 - 1) * (B - 1)); d.rotation.set(0, rnd() * TAU, 0);
+      var ts = 0.8 + rnd() * 0.9; d.scale.set(ts, ts, ts); d.updateMatrix(); tufts.setMatrixAt(i, d.matrix);
+    }
+    scene.add(tufts);
+    var rock = mergeParts([P(ICO, 0x8f948c, 0, 0.18, 0, 0.35, 0.22, 0.3), P(ICO, 0xa6aaa2, 0.28, 0.1, 0.1, 0.2, 0.13, 0.18)]);
+    var rocks = new THREE.InstancedMesh(rock, vcMat, 16);
+    for (i = 0; i < 16; i++) {
+      d.position.set((rnd() * 2 - 1) * (B - 2), 0, (rnd() * 2 - 1) * (B - 2)); d.rotation.set(0, rnd() * TAU, 0);
+      var rs = 0.8 + rnd() * 0.8; d.scale.set(rs, rs, rs); d.updateMatrix(); rocks.setMatrixAt(i, d.matrix);
+    }
+    scene.add(rocks);
+  })();
+
+  // hero: armoured knight with cape, plume and glowing sword
   var heroGroup = new THREE.Group();
   var heroVis = new THREE.Group();
-  function part(geo, color, x, y, z) {
-    var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: color }));
-    m.position.set(x, y, z);
-    heroVis.add(m);
-    return m;
+  function hp(geo, color, x, y, z, sx, sy, sz, em) {
+    var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: color, emissive: em || 0x000000 }));
+    m.position.set(x, y, z); m.scale.set(sx, sy, sz); heroVis.add(m); return m;
   }
-  part(new THREE.CylinderGeometry(0.42, 0.5, 1.1, 12), 0x4d73d9, 0, 0.6, 0);
-  part(new THREE.SphereGeometry(0.36, 14, 10), 0xe2e2eb, 0, 1.4, 0);
-  part(new THREE.BoxGeometry(0.1, 0.3, 0.32), 0xd93333, 0, 1.8, 0);
-  part(new THREE.BoxGeometry(0.1, 0.1, 1.0), 0xf2f2ff, 0.55, 0.9, 0.5);
+  hp(BOX, 0x39445f, -0.16, 0.3, 0, 0.2, 0.6, 0.22);      // legs
+  hp(BOX, 0x39445f, 0.16, 0.3, 0, 0.2, 0.6, 0.22);
+  hp(BOX, 0x2a2f42, -0.16, 0.06, 0.06, 0.24, 0.12, 0.34); // boots
+  hp(BOX, 0x2a2f42, 0.16, 0.06, 0.06, 0.24, 0.12, 0.34);
+  hp(CYL, 0x4a74d8, 0, 0.95, 0, 0.42, 0.7, 0.34);          // torso
+  hp(CYL, 0x8f98ad, 0, 1.0, 0.02, 0.44, 0.34, 0.36);       // chest plate
+  hp(CYL, 0xe0b84a, 0, 0.66, 0, 0.45, 0.1, 0.37);          // belt
+  hp(SPH, 0xaeb8cc, -0.5, 1.22, 0, 0.2, 0.17, 0.2);        // shoulders
+  hp(SPH, 0xaeb8cc, 0.5, 1.22, 0, 0.2, 0.17, 0.2);
+  var cape = hp(BOX, 0xc03040, 0, 0.95, -0.34, 0.74, 1.05, 0.06);
+  cape.rotation.x = 0.12;
+  hp(SPH, 0xc9d1e2, 0, 1.58, 0, 0.3, 0.32, 0.3);            // helmet
+  hp(BOX, 0x1b2030, 0, 1.58, 0.25, 0.3, 0.07, 0.12);       // visor
+  hp(CONE, 0xd93a3a, 0, 1.98, -0.04, 0.09, 0.34, 0.2);     // plume
+  hp(BOX, 0x6a4a2b, 0.62, 0.95, 0.12, 0.07, 0.07, 0.3);    // sword handle
+  hp(BOX, 0xe0b84a, 0.62, 0.95, 0.3, 0.3, 0.07, 0.07);     // guard
+  hp(BOX, 0xeaf6ff, 0.62, 0.95, 0.85, 0.09, 0.05, 1.0, 0x2a7aa0); // blade
+  var shield = hp(CYL, 0x3a5fc0, -0.62, 0.98, 0.12, 0.3, 0.07, 0.3);
+  shield.rotation.z = Math.PI / 2;
+  hp(SPH, 0xe0b84a, -0.7, 0.98, 0.12, 0.09, 0.09, 0.09);
   heroGroup.add(heroVis);
   scene.add(heroGroup);
 
-  // instanced enemies (one draw call per type)
-  var CAP = 260;
+  // enemies: merged multi-colour models, one instanced draw call per type
+  var MODELS = {
+    slime: mergeParts([
+      P(SPH, 0x59bf59, 0, 0.36, 0, 0.5, 0.38, 0.5), P(SPH, 0xb5f0a0, -0.18, 0.6, 0.18, 0.12, 0.08, 0.1),
+      P(SPH, 0xffffff, -0.17, 0.44, 0.38, 0.11, 0.12, 0.08), P(SPH, 0xffffff, 0.17, 0.44, 0.38, 0.11, 0.12, 0.08),
+      P(SPH, 0x111111, -0.17, 0.44, 0.45, 0.05, 0.06, 0.04), P(SPH, 0x111111, 0.17, 0.44, 0.45, 0.05, 0.06, 0.04)]),
+    skeleton: mergeParts([
+      P(SPH, 0xe8e3cf, 0, 1.12, 0, 0.24, 0.26, 0.24), P(BOX, 0xe8e3cf, 0, 0.92, 0.07, 0.2, 0.08, 0.16),
+      P(SPH, 0x1a1a1a, -0.09, 1.14, 0.2, 0.06, 0.07, 0.04), P(SPH, 0x1a1a1a, 0.09, 1.14, 0.2, 0.06, 0.07, 0.04),
+      P(BOX, 0xcfc9b0, 0, 0.68, 0, 0.4, 0.46, 0.2), P(BOX, 0x8a846f, 0, 0.68, 0.11, 0.3, 0.05, 0.02),
+      P(BOX, 0xe8e3cf, -0.27, 0.68, 0, 0.09, 0.44, 0.09), P(BOX, 0xe8e3cf, 0.27, 0.68, 0, 0.09, 0.44, 0.09),
+      P(BOX, 0xe8e3cf, -0.1, 0.22, 0, 0.1, 0.44, 0.1), P(BOX, 0xe8e3cf, 0.1, 0.22, 0, 0.1, 0.44, 0.1),
+      P(BOX, 0x8a8f99, 0.36, 0.5, 0.2, 0.05, 0.05, 0.6)]),
+    brute: mergeParts([
+      P(BOX, 0xb33833, 0, 0.9, 0, 1.1, 1.0, 0.8), P(BOX, 0x8f2a26, 0, 1.7, 0.05, 0.62, 0.5, 0.55),
+      P(CONE, 0xf0eadc, -0.3, 2.1, 0, 0.12, 0.45, 0.12, 0, 0.35), P(CONE, 0xf0eadc, 0.3, 2.1, 0, 0.12, 0.45, 0.12, 0, -0.35),
+      P(BOX, 0xffe14d, -0.15, 1.74, 0.3, 0.13, 0.08, 0.05), P(BOX, 0xffe14d, 0.15, 1.74, 0.3, 0.13, 0.08, 0.05),
+      P(BOX, 0x9d302c, -0.72, 0.95, 0, 0.3, 0.9, 0.3), P(BOX, 0x9d302c, 0.72, 0.95, 0, 0.3, 0.9, 0.3),
+      P(BOX, 0x5a1c1a, -0.28, 0.22, 0, 0.36, 0.44, 0.36), P(BOX, 0x5a1c1a, 0.28, 0.22, 0, 0.36, 0.44, 0.36),
+      P(BOX, 0x5a4a3a, 0.78, 0.5, 0.35, 0.16, 1.1, 0.16)])
+  };
+  var CAP = 300;
   var emesh = {};
+  var WHITE = new THREE.Color(1, 1, 1), FLASH = new THREE.Color(3, 3, 3);
   ETYPES.forEach(function (t) {
-    var d = ENEMY[t];
-    var geo = d.shape === 'sphere' ? new THREE.SphereGeometry(0.5, 12, 8)
-            : d.shape === 'cyl' ? new THREE.CylinderGeometry(0.5, 0.5, 2, 10)
-            : new THREE.BoxGeometry(1, 1, 1);
-    var m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), CAP);
+    var m = new THREE.InstancedMesh(MODELS[t], vcMat, CAP);
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.frustumCulled = false;
-    for (var i = 0; i < CAP; i++) m.setColorAt(i, new THREE.Color(d.color));
+    for (var i = 0; i < CAP; i++) m.setColorAt(i, WHITE);
     m.count = 0;
     scene.add(m);
     emesh[t] = m;
   });
 
-  var gemMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0x5ad8ff }), 500);
+  var shadowGeo = new THREE.CircleGeometry(0.5, 16); shadowGeo.rotateX(-Math.PI / 2);
+  var shadowMesh = new THREE.InstancedMesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }), CAP + 2);
+  shadowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); shadowMesh.frustumCulled = false; shadowMesh.count = 0;
+  scene.add(shadowMesh);
+
+  var gemMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: 0x5ad8ff }), 500);
   gemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   gemMesh.frustumCulled = false; gemMesh.count = 0;
   scene.add(gemMesh);
 
-  var boltMat = new THREE.MeshBasicMaterial({ color: 0xffd84d });
-  var boltGeo = new THREE.SphereGeometry(0.18, 8, 6);
-  var bladeGeo = new THREE.BoxGeometry(0.25, 0.2, 0.9);
-  var bladeMat = new THREE.MeshLambertMaterial({ color: 0x99e6ff });
+  var boltCore = new THREE.SphereGeometry(0.2, 10, 8), boltHalo = new THREE.SphereGeometry(0.42, 10, 8);
+  var boltCoreMat = new THREE.MeshBasicMaterial({ color: 0xfff1b0 });
+  var boltHaloMat = new THREE.MeshBasicMaterial({ color: 0xffc83a, transparent: true, opacity: 0.4, depthWrite: false });
+  function makeBolt() { var g = new THREE.Group(); g.add(new THREE.Mesh(boltCore, boltCoreMat)); g.add(new THREE.Mesh(boltHalo, boltHaloMat)); return g; }
+  var bladeGeo = mergeParts([P(BOX, 0xeaf8ff, 0, 0, 0, 0.14, 0.1, 1.5), P(BOX, 0x7fd8ff, 0, 0, 0, 0.3, 0.06, 1.1), P(BOX, 0xe0b84a, 0, 0, -0.55, 0.4, 0.12, 0.12)]);
+  var bladeMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2f7fa8 });
+  var orbitRing = new THREE.Mesh(new THREE.RingGeometry(ORBIT_R - 0.12, ORBIT_R + 0.12, 64), new THREE.MeshBasicMaterial({ color: 0x8fe0ff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+  orbitRing.rotation.x = -Math.PI / 2; orbitRing.visible = false;
+  scene.add(orbitRing);
   var pulseMesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.04, 40), new THREE.MeshBasicMaterial({ color: 0xfff2a0, transparent: true, opacity: 0.5 }));
   pulseMesh.visible = false;
   scene.add(pulseMesh);
@@ -216,7 +377,6 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
   // ---------- game state ----------
   var G, boltMeshes = [], blades = [];
   var dummy = new THREE.Object3D();
-  var WHITE = new THREE.Color(0xffffff);
 
   function fresh() {
     return {
@@ -322,8 +482,14 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
 
   // ---------- run flow ----------
   function spawnOne(type) {
-    var def = ENEMY[type], a = Math.random() * Math.PI * 2;
-    G.enemies.push({ type: type, def: def, x: G.hero.x + Math.cos(a) * CFG.spawnR, z: G.hero.z + Math.sin(a) * CFG.spawnR,
+    var def = ENEMY[type], lim = CFG.bound - 1, x = 0, z = 0;
+    for (var tries = 0; tries < 14; tries++) {
+      var a = Math.random() * Math.PI * 2;
+      x = G.hero.x + Math.cos(a) * CFG.spawnR; z = G.hero.z + Math.sin(a) * CFG.spawnR;
+      if (Math.abs(x) < lim && Math.abs(z) < lim) break;
+    }
+    x = Math.max(-lim, Math.min(lim, x)); z = Math.max(-lim, Math.min(lim, z));
+    G.enemies.push({ type: type, def: def, x: x, z: z,
       hp: def.hp * (1 + 0.15 * G.wave), cd: 0, dead: false, flash: 0, ang: 0, ph: Math.random() * 6 });
   }
 
@@ -384,6 +550,7 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
       var sp = e.def.speed;
       e.x += (nx * sp + px * sp * 1.5) * dt;
       e.z += (nz * sp + pz * sp * 1.5) * dt;
+      e.x = Math.max(-CFG.bound + 0.5, Math.min(CFG.bound - 0.5, e.x)); e.z = Math.max(-CFG.bound + 0.5, Math.min(CFG.bound - 0.5, e.z));
       if (dist > 0.001) e.ang = Math.atan2(nx, nz);
       e.cd -= dt; e.flash -= dt;
       if (e.cd <= 0 && dist < e.def.r + 0.5) { h.hp -= e.def.dmg; e.cd = 0.9; if (h.hp <= 0) { h.hp = 0; G.phase = 'fail'; showResult(); } }
@@ -424,10 +591,10 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
         var cnt = ORBIT.count[k.lvl - 1];
         for (var i2 = 0; i2 < cnt; i2++) {
           var a = (G.orbitAngle + 360 * i2 / cnt) * Math.PI / 180;
-          var bx = h.x + Math.cos(a) * 2.2, bz = h.z + Math.sin(a) * 2.2;
+          var bx = h.x + Math.cos(a) * ORBIT_R, bz = h.z + Math.sin(a) * ORBIT_R;
           k.blades = k.blades || [];
           k.blades[i2] = { x: bx, z: bz, a: a };
-          queryCircle(bx, bz, 0.5, tmpB);
+          queryCircle(bx, bz, 0.9, tmpB);
           for (var q2 = 0; q2 < tmpB.length; q2++) {
             var nx2 = G.orbitHit.get(tmpB[q2]);
             if (nx2 !== undefined && now < nx2) continue;
@@ -474,8 +641,12 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
       return SKILLS[id].active ? act < CFG.maxActive : pas < CFG.maxPassive;
     });
     for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
-    pool = pool.slice(0, 3);
-    return pool.length ? pool : ['heal'];
+    var picks = pool.slice(0, 3);
+    if (picks.length && !picks.some(function (id) { return SKILLS[id].active; })) {
+      var atk = pool.slice(3).filter(function (id) { return SKILLS[id].active; });
+      if (atk.length) picks[picks.length - 1] = atk[0];
+    }
+    return picks.length ? picks : ['heal'];
   }
 
   var overlay = document.getElementById('overlay');
@@ -548,7 +719,7 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
   function renderSync() {
     var h = G.hero;
     heroGroup.position.set(h.x, 0, h.z);
-    var counts = { slime: 0, skeleton: 0, brute: 0 };
+    var counts = { slime: 0, skeleton: 0, brute: 0 }, shc = 0;
     var es = G.enemies;
     for (var i = 0; i < es.length; i++) {
       var e = es[i]; if (e.dead) continue;
@@ -556,13 +727,18 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
       if (idx >= CAP) continue;
       counts[e.type]++;
       var s = e.def.scale;
-      dummy.position.set(e.x, e.def.baseY + Math.abs(Math.sin(G.now * 7 + e.ph)) * 0.12, e.z);
+      dummy.position.set(e.x, Math.abs(Math.sin(G.now * 7 + e.ph)) * 0.1, e.z);
       dummy.rotation.set(0, e.ang, 0);
-      dummy.scale.set(s[0], s[1], s[2]);
+      dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
       m.setMatrixAt(idx, dummy.matrix);
-      m.setColorAt(idx, e.flash > 0 ? WHITE : (e.def.c || (e.def.c = new THREE.Color(e.def.color))));
+      m.setColorAt(idx, e.flash > 0 ? FLASH : WHITE);
+      dummy.position.set(e.x, 0.03, e.z); dummy.rotation.set(0, 0, 0); var ss = e.def.r * 2.6; dummy.scale.set(ss, 1, ss); dummy.updateMatrix();
+      shadowMesh.setMatrixAt(shc++, dummy.matrix);
     }
+    dummy.position.set(h.x, 0.03, h.z); dummy.rotation.set(0, 0, 0); dummy.scale.set(1.5, 1, 1.5); dummy.updateMatrix();
+    shadowMesh.setMatrixAt(shc++, dummy.matrix);
+    shadowMesh.count = shc; shadowMesh.instanceMatrix.needsUpdate = true;
     ETYPES.forEach(function (t) {
       var m = emesh[t]; m.count = counts[t];
       m.instanceMatrix.needsUpdate = true;
@@ -576,7 +752,7 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
     var bk = skillOf('bolt'), bc = 0;
     if (bk) bk.bolts.forEach(function (b) {
       var mesh = boltMeshes[bc];
-      if (!mesh) { mesh = new THREE.Mesh(boltGeo, boltMat); scene.add(mesh); boltMeshes.push(mesh); }
+      if (!mesh) { mesh = makeBolt(); scene.add(mesh); boltMeshes.push(mesh); }
       mesh.visible = true; mesh.position.set(b.x, 0.8, b.z); bc++;
     });
     for (var q = bc; q < boltMeshes.length; q++) boltMeshes[q].visible = false;
@@ -589,11 +765,11 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
       bm.visible = true; bm.position.set(bl.x, 0.8, bl.z); bm.rotation.y = -bl.a; oc++;
     }
     for (var u = oc; u < blades.length; u++) if (blades[u]) blades[u].visible = false;
+    orbitRing.visible = !!ok;
+    if (ok) orbitRing.position.set(h.x, 0.04, h.z);
 
     pulseMesh.visible = G.pulseFlash > 0;
     if (pulseMesh.visible) pulseMesh.position.set(h.x, 0.05, h.z);
-
-    ground.position.set(Math.round(h.x / PERIOD) * PERIOD, 0, Math.round(h.z / PERIOD) * PERIOD);
 
     // camera
     var k = 1 - Math.exp(-10 * 0.016);
@@ -619,6 +795,7 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
     G.now += dt; G.t += dt;
     var m = window.__move || readMove(), h = G.hero;
     h.x += m[0] * G.st.move * dt; h.z += m[1] * G.st.move * dt;
+    h.x = Math.max(-CFG.bound + 0.6, Math.min(CFG.bound - 0.6, h.x)); h.z = Math.max(-CFG.bound + 0.6, Math.min(CFG.bound - 0.6, h.z));
     if (m[0] * m[0] + m[1] * m[1] > 0.01) h.face = Math.atan2(m[0], m[1]);
     heroVis.rotation.y += (h.face - heroVis.rotation.y) * 0.25;
     h.hp = Math.min(G.st.maxHp, h.hp + 0.5 * dt);
@@ -641,6 +818,7 @@ var ETYPES = ['slime', 'skeleton', 'brute'];
   window.__dbg = function () { return G; };
   window.__addExp = function (v) { addExp(v); };
   window.__spawn = function (t) { spawnOne(t); };
+  window.__roll = function () { return rollChoices(); };
   window.__step = update;
   window.__pick = function () { if (G.phase === 'level') pick(G.choices[Math.floor(Math.random() * G.choices.length)]); };
   start();

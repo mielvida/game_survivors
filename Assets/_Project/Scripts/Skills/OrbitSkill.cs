@@ -8,7 +8,7 @@ namespace Survivors
         static readonly int[] Count = { 2, 2, 3, 3, 4 };
         static readonly float[] Damage = { 6f, 8f, 8f, 10f, 12f };
 
-        const float OrbitRadius = 2.2f;
+        const float OrbitRadius = 3.2f;
         const float DegPerSec = 200f;
         const float HitInterval = 0.4f;
 
@@ -24,7 +24,7 @@ namespace Survivors
             int n = Count[Level - 1];
             while (_blades.Count < n)
             {
-                var g = Visuals.Prim(PrimitiveType.Cube, new Color(0.6f, 0.9f, 1f), new Vector3(0.25f, 0.2f, 0.9f), Bootstrap.Root.transform);
+                var g = Visuals.Prim(PrimitiveType.Cube, new Color(0.6f, 0.9f, 1f), new Vector3(0.3f, 0.25f, 1.5f), Bootstrap.Root.transform);
                 _blades.Add(g);
             }
 
@@ -38,7 +38,7 @@ namespace Survivors
                 _blades[i].transform.position = new Vector3(x, 0.8f, z);
                 _blades[i].transform.rotation = Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f);
 
-                EnemyManager.I.QueryCircle(x, z, 0.5f, _tmp);
+                EnemyManager.I.QueryCircle(x, z, 0.9f, _tmp);
                 for (int k = 0; k < _tmp.Count; k++)
                 {
                     var e = _tmp[k];

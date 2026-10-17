@@ -57,8 +57,7 @@ namespace Survivors
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.45f, 0.5f, 0.55f);
 
-            var ground = Root.AddComponent<GroundFollower>();
-            ground.Build();
+            ArenaBuilder.Build(Root.transform);
 
             var heroGo = new GameObject("Hero");
             heroGo.transform.SetParent(Root.transform, false);
@@ -95,23 +94,22 @@ namespace Survivors
         }
     }
 
-    // Large checkerboard plane that snaps to the hero in whole texture periods,
-    // so it looks infinite and the pattern stays fixed in world space.
-    public sealed class GroundFollower : MonoBehaviour
+    // Static square arena: checkerboard floor, low stone walls and corner pillars.
+    public static class ArenaBuilder
     {
-        const float PlaneSize = 176f;  // metres (a Unity Plane is 10 units at scale 1)
-        const float Period = 8f;       // metres per full 2x2 checker repeat
+        const float Period = 8f; // metres per full 2x2 checker repeat
 
-        Transform _plane;
-
-        public void Build()
+        public static void Build(Transform parent)
         {
+            float half = Config.ArenaHalf;
+            float size = half * 2f;
+
             var g = GameObject.CreatePrimitive(PrimitiveType.Plane);
             var col = g.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            if (col != null) Object.Destroy(col);
             g.name = "Ground";
-            g.transform.SetParent(transform, false);
-            g.transform.localScale = new Vector3(PlaneSize / 10f, 1f, PlaneSize / 10f);
+            g.transform.SetParent(parent, false);
+            g.transform.localScale = new Vector3(size / 10f, 1f, size / 10f);
 
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             tex.filterMode = FilterMode.Point;
@@ -123,19 +121,32 @@ namespace Survivors
 
             var mat = new Material(Visuals.Mat(a));
             mat.mainTexture = tex;
-            mat.mainTextureScale = new Vector2(PlaneSize / Period, PlaneSize / Period);
+            mat.mainTextureScale = new Vector2(size / Period, size / Period);
             g.GetComponent<Renderer>().sharedMaterial = mat;
-            _plane = g.transform;
+
+            var wall = new Color(0.49f, 0.51f, 0.55f);
+            float len = size + 3f;
+            Wall(parent, wall, new Vector3(0f, 0.35f, -half - 0.5f), new Vector3(len, 0.7f, 1f));
+            Wall(parent, wall, new Vector3(0f, 0.35f, half + 0.5f), new Vector3(len, 0.7f, 1f));
+            Wall(parent, wall, new Vector3(-half - 0.5f, 0.35f, 0f), new Vector3(1f, 0.7f, len));
+            Wall(parent, wall, new Vector3(half + 0.5f, 0.35f, 0f), new Vector3(1f, 0.7f, len));
+
+            var pillar = new Color(0.36f, 0.39f, 0.42f);
+            var torch = new Color(1f, 0.65f, 0.24f);
+            for (int sx = -1; sx <= 1; sx += 2)
+                for (int sz = -1; sz <= 1; sz += 2)
+                {
+                    float cx = sx * (half + 0.5f), cz = sz * (half + 0.5f);
+                    Wall(parent, pillar, new Vector3(cx, 1.8f, cz), new Vector3(2f, 3.6f, 2f));
+                    var orb = Visuals.Prim(PrimitiveType.Sphere, torch, new Vector3(1f, 1f, 1f), parent);
+                    orb.transform.position = new Vector3(cx, 4.3f, cz);
+                }
         }
 
-        void LateUpdate()
+        static void Wall(Transform parent, Color c, Vector3 pos, Vector3 scale)
         {
-            var h = Hero.I;
-            if (h == null || _plane == null) return;
-            _plane.position = new Vector3(
-                Mathf.Round(h.X / Period) * Period,
-                0f,
-                Mathf.Round(h.Z / Period) * Period);
+            var w = Visuals.Prim(PrimitiveType.Cube, c, scale, parent);
+            w.transform.position = pos;
         }
     }
 }

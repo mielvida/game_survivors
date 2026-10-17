@@ -132,6 +132,8 @@ namespace Survivors
                 float sp = e.Def.Speed;
                 e.X += (nx * sp + px * sp * 1.5f) * dt;
                 e.Z += (nz * sp + pz * sp * 1.5f) * dt;
+                e.X = Mathf.Clamp(e.X, -Config.ArenaHalf + 0.5f, Config.ArenaHalf - 0.5f);
+                e.Z = Mathf.Clamp(e.Z, -Config.ArenaHalf + 0.5f, Config.ArenaHalf - 0.5f);
 
                 e.Tr.position = new Vector3(e.X, e.Def.BaseY + Mathf.Abs(Mathf.Sin(t * 7f + i)) * 0.12f, e.Z);
                 if (dist > 0.001f) e.Tr.rotation = Quaternion.LookRotation(new Vector3(nx, 0f, nz));

@@ -115,6 +115,19 @@ namespace Survivors
 
             var result = new List<SkillDef>();
             for (int i = 0; i < pool.Count && result.Count < count; i++) result.Add(pool[i]);
+
+            // Every level-up offers at least one attack skill when any is available.
+            bool hasActive = false;
+            for (int i = 0; i < result.Count; i++) if (result[i].Active) hasActive = true;
+            if (!hasActive && result.Count > 0)
+            {
+                for (int i = result.Count; i < pool.Count; i++)
+                {
+                    if (!pool[i].Active) continue;
+                    result[result.Count - 1] = pool[i];
+                    break;
+                }
+            }
             if (result.Count == 0) result.Add(Heal);
             return result;
         }

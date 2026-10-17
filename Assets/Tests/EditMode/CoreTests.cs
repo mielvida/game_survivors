@@ -74,6 +74,22 @@ namespace Survivors.Tests
         }
 
         [Test]
+        public void RollAlwaysOffersAnAttackSkill()
+        {
+            var owned = new List<Skill>
+            {
+                new PassiveSkill { Def = SkillLibrary.Might },
+                new PassiveSkill { Def = SkillLibrary.Haste },
+                new PassiveSkill { Def = SkillLibrary.Boots },
+            };
+            for (int seed = 0; seed < 100; seed++)
+            {
+                var picks = SkillLibrary.Roll(owned, 3, new Random(seed));
+                Assert.IsTrue(picks.Exists(d => d.Active), "seed " + seed);
+            }
+        }
+
+        [Test]
         public void RollFallsBackToHealWhenEverythingIsMaxed()
         {
             var owned = new List<Skill>();

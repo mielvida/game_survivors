@@ -81,6 +81,8 @@ namespace Survivors
             Vector2 m = InputService.Move;
             X += m.x * Stats.MoveSpeed * dt;
             Z += m.y * Stats.MoveSpeed * dt;
+            X = Mathf.Clamp(X, -Config.ArenaHalf + 0.6f, Config.ArenaHalf - 0.6f);
+            Z = Mathf.Clamp(Z, -Config.ArenaHalf + 0.6f, Config.ArenaHalf - 0.6f);
             transform.position = new Vector3(X, 0f, Z);
 
             if (m.sqrMagnitude > 0.01f)

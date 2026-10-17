@@ -146,9 +146,18 @@ namespace Survivors
 
         void SpawnOne(EnemyDef def)
         {
-            float a = (float)_rng.NextDouble() * Mathf.PI * 2f;
-            float x = _hero.X + Mathf.Cos(a) * Config.SpawnRadius;
-            float z = _hero.Z + Mathf.Sin(a) * Config.SpawnRadius;
+            // Pick a point on the spawn ring that lies inside the arena; clamp as a fallback.
+            float lim = Config.ArenaHalf - 1f;
+            float x = 0f, z = 0f;
+            for (int tries = 0; tries < 14; tries++)
+            {
+                float a = (float)_rng.NextDouble() * Mathf.PI * 2f;
+                x = _hero.X + Mathf.Cos(a) * Config.SpawnRadius;
+                z = _hero.Z + Mathf.Sin(a) * Config.SpawnRadius;
+                if (Mathf.Abs(x) < lim && Mathf.Abs(z) < lim) break;
+            }
+            x = Mathf.Clamp(x, -lim, lim);
+            z = Mathf.Clamp(z, -lim, lim);
             float hpMul = 1f + 0.15f * Wave;
             EnemyManager.I.Spawn(def, x, z, hpMul);
         }
