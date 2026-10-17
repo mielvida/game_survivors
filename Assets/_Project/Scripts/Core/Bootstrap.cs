@@ -94,7 +94,7 @@ namespace Survivors
         }
     }
 
-    // Static square arena: checkerboard floor, low stone walls and corner pillars.
+    // Static square arena shaped like a floating island: checkerboard floor and a cliff edge.
     public static class ArenaBuilder
     {
         const float Period = 8f; // metres per full 2x2 checker repeat
@@ -124,23 +124,66 @@ namespace Survivors
             mat.mainTextureScale = new Vector2(size / Period, size / Period);
             g.GetComponent<Renderer>().sharedMaterial = mat;
 
-            var wall = new Color(0.49f, 0.51f, 0.55f);
-            float len = size + 3f;
-            Wall(parent, wall, new Vector3(0f, 0.35f, -half - 0.5f), new Vector3(len, 0.7f, 1f));
-            Wall(parent, wall, new Vector3(0f, 0.35f, half + 0.5f), new Vector3(len, 0.7f, 1f));
-            Wall(parent, wall, new Vector3(-half - 0.5f, 0.35f, 0f), new Vector3(1f, 0.7f, len));
-            Wall(parent, wall, new Vector3(half + 0.5f, 0.35f, 0f), new Vector3(1f, 0.7f, len));
+            // Cliff face: stacked rock layers dropping below the edge, plus a void floor far below.
+            var strata = new[] { new Color(0.36f, 0.31f, 0.27f), new Color(0.42f, 0.36f, 0.30f), new Color(0.31f, 0.27f, 0.25f), new Color(0.45f, 0.40f, 0.35f) };
+            float len = size + 2f;
+            for (int layer = 0; layer < 7; layer++)
+            {
+                float y = -layer * 2f - 1f;
+                float outer = 0.4f + layer * 0.55f;
+                float thick = 1.6f + layer * 0.3f;
+                var c = strata[layer % strata.Length];
+                Wall(parent, c, new Vector3(0f, y, -half - outer), new Vector3(len, 2.2f, thick));
+                Wall(parent, c, new Vector3(0f, y, half + outer), new Vector3(len, 2.2f, thick));
+                Wall(parent, c, new Vector3(-half - outer, y, 0f), new Vector3(thick, 2.2f, len));
+                Wall(parent, c, new Vector3(half + outer, y, 0f), new Vector3(thick, 2.2f, len));
+            }
 
-            var pillar = new Color(0.36f, 0.39f, 0.42f);
-            var torch = new Color(1f, 0.65f, 0.24f);
+            // Rock lip: boulders along the edge, some with a mossy cap.
+            var rng = new System.Random(7);
+            var rock = new[] { new Color(0.43f, 0.42f, 0.39f), new Color(0.49f, 0.47f, 0.43f), new Color(0.37f, 0.36f, 0.34f) };
+            var moss = new Color(0.25f, 0.49f, 0.27f);
+            for (int side = 0; side < 4; side++)
+            {
+                for (float k = -half; k <= half; k += 1.7f)
+                {
+                    float jitter = (float)rng.NextDouble() * 0.9f;
+                    float s1 = 0.9f + (float)rng.NextDouble() * 1.1f;
+                    float hh = 0.5f + (float)rng.NextDouble() * 1.0f;
+                    float off = half + 0.3f + jitter;
+                    float along = k + (float)rng.NextDouble();
+                    Vector3 pos = side == 0 ? new Vector3(along, hh * 0.4f, -off)
+                                : side == 1 ? new Vector3(along, hh * 0.4f, off)
+                                : side == 2 ? new Vector3(-off, hh * 0.4f, along)
+                                : new Vector3(off, hh * 0.4f, along);
+                    var boulder = Visuals.Prim(PrimitiveType.Sphere, rock[rng.Next(rock.Length)], new Vector3(s1 * 2f, hh * 2f, s1 * 2f), parent);
+                    boulder.transform.position = pos;
+                    if (rng.NextDouble() < 0.55)
+                    {
+                        var cap = Visuals.Prim(PrimitiveType.Sphere, moss, new Vector3(s1 * 1.6f, hh * 0.6f, s1 * 1.4f), parent);
+                        cap.transform.position = pos + new Vector3(0f, hh * 0.75f, 0f);
+                    }
+                }
+            }
+
+            // Corner crystals.
+            var crystal = new Color(0.48f, 0.55f, 1f);
             for (int sx = -1; sx <= 1; sx += 2)
                 for (int sz = -1; sz <= 1; sz += 2)
                 {
-                    float cx = sx * (half + 0.5f), cz = sz * (half + 0.5f);
-                    Wall(parent, pillar, new Vector3(cx, 1.8f, cz), new Vector3(2f, 3.6f, 2f));
-                    var orb = Visuals.Prim(PrimitiveType.Sphere, torch, new Vector3(1f, 1f, 1f), parent);
-                    orb.transform.position = new Vector3(cx, 4.3f, cz);
+                    var cr = Visuals.Prim(PrimitiveType.Cube, crystal, new Vector3(0.9f, 3.2f, 0.9f), parent);
+                    cr.transform.position = new Vector3(sx * (half + 0.7f), 1.6f, sz * (half + 0.7f));
+                    cr.transform.rotation = Quaternion.Euler(0f, 45f, 8f);
                 }
+
+            // Void floor far below the island.
+            var voidPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            var vc = voidPlane.GetComponent<Collider>();
+            if (vc != null) Object.Destroy(vc);
+            voidPlane.transform.SetParent(parent, false);
+            voidPlane.transform.position = new Vector3(0f, -16f, 0f);
+            voidPlane.transform.localScale = new Vector3(40f, 1f, 40f);
+            voidPlane.GetComponent<Renderer>().sharedMaterial = Visuals.Mat(new Color(0.1f, 0.14f, 0.2f));
         }
 
         static void Wall(Transform parent, Color c, Vector3 pos, Vector3 scale)
