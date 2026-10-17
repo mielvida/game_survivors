@@ -87,13 +87,13 @@ body {
   if (!window.THREE) { errBox.textContent = '3D 라이브러리를 불러오지 못했습니다.'; return; }
 
   // ---------- config & data (mirrors the Unity prototype) ----------
-  var CFG = { dur: 300, max: 200, spawnR: 20, pitch: 55 * Math.PI / 180, dist: 30, fov: 40, elite: 150, maxActive: 4, maxPassive: 4 };
+  var CFG = { dur: 300, max: 200, spawnR: 26, pitch: 55 * Math.PI / 180, dist: 44, fov: 40, elite: 150, maxActive: 4, maxPassive: 4 };
   var expReq = function (l) { return 2 + 2 * l + Math.floor(l * l / 4); };
 
   var ENEMY = {
-    slime:    { hp: 12,  speed: 1.8, dmg: 4,  r: 0.4, exp: 1,  color: 0x59bf59, scale: [0.9, 0.7, 0.9], shape: 'sphere', baseY: 0.35 },
-    skeleton: { hp: 28,  speed: 2.3, dmg: 7,  r: 0.4, exp: 2,  color: 0xe0dbbf, scale: [0.6, 0.6, 0.6], shape: 'cyl',    baseY: 0.6 },
-    brute:    { hp: 500, speed: 2.0, dmg: 14, r: 0.8, exp: 25, color: 0xb33833, scale: [1.5, 1.5, 1.5], shape: 'box',    baseY: 0.75 }
+    slime:    { hp: 12,  speed: 2.0, dmg: 5,  r: 0.4, exp: 1,  color: 0x59bf59, scale: [0.9, 0.7, 0.9], shape: 'sphere', baseY: 0.35 },
+    skeleton: { hp: 32,  speed: 2.5, dmg: 8,  r: 0.4, exp: 2,  color: 0xe0dbbf, scale: [0.6, 0.6, 0.6], shape: 'cyl',    baseY: 0.6 },
+    brute:    { hp: 550, speed: 2.0, dmg: 16, r: 0.8, exp: 25, color: 0xb33833, scale: [1.5, 1.5, 1.5], shape: 'box',    baseY: 0.75 }
   };
   var ETYPES = ['slime', 'skeleton', 'brute'];
 
@@ -109,7 +109,7 @@ body {
     heal:   { name: '회복',        active: false, txt: ['체력 30% 회복'] }
   };
   var SKILL_IDS = ['bolt', 'orbit', 'pulse', 'might', 'haste', 'boots', 'magnet', 'vital'];
-  var BOLT = { count: [1, 1, 2, 2, 3], cd: [0.8, 0.75, 0.75, 0.65, 0.6], dmg: [14, 16, 16, 19, 22], pierce: [2, 2, 2, 3, 4] };
+  var BOLT = { count: [1, 1, 2, 2, 3], cd: [0.9, 0.85, 0.85, 0.7, 0.65], dmg: [14, 16, 16, 19, 22], pierce: [1, 1, 1, 2, 3] };
   var ORBIT = { count: [2, 2, 3, 3, 4], dmg: [6, 8, 8, 10, 12] };
   var PULSE = { interval: [3, 3, 2.5, 2.5, 1.8], radius: [3, 3.5, 3.5, 3.5, 5], dmg: [12, 15, 18, 24, 28] };
 
@@ -121,8 +121,8 @@ body {
   stage.appendChild(renderer.domElement);
 
   var scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x121c20, 45, 85);
-  var camera = new THREE.PerspectiveCamera(CFG.fov, 1, 0.3, 160);
+  scene.fog = new THREE.Fog(0x121c20, 70, 130);
+  var camera = new THREE.PerspectiveCamera(CFG.fov, 1, 0.3, 240);
   scene.add(new THREE.AmbientLight(0xa8b8c0, 0.85));
   var sun = new THREE.DirectionalLight(0xfff2dc, 0.9);
   sun.position.set(-6, 10, 5);
@@ -138,7 +138,7 @@ body {
   resize();
 
   // ground: checker texture, plane snaps to the hero in whole periods so it looks endless
-  var PLANE = 120, PERIOD = 8;
+  var PLANE = 176, PERIOD = 8;
   var gc = document.createElement('canvas'); gc.width = gc.height = 2;
   var gx = gc.getContext('2d');
   var cA = '#29443a', cB = '#30503f';
@@ -206,15 +206,15 @@ body {
   function fresh() {
     return {
       phase: 'play', t: 0, level: 1, exp: 0, kills: 0, pending: 0, choices: null,
-      hero: { x: 0, z: 0, hp: 150, face: 0 },
-      st: { dmg: 1, spd: 1, move: 5.5, magnet: 3, maxHp: 150 },
+      hero: { x: 0, z: 0, hp: 120, face: 0 },
+      st: { dmg: 1, spd: 1, move: 5.5, magnet: 3, maxHp: 120 },
       skills: [{ id: 'bolt', lvl: 1, timer: 0, bolts: [] }],
       enemies: [], gems: [], spawnT: 0, elite: false, orbitAngle: 0, orbitHit: new Map(), pulseT: 1, pulseFlash: 0, focusX: 0, focusZ: 0, now: 0
     };
   }
 
   function recompute() {
-    var s = G.st; s.dmg = 1; s.spd = 1; s.move = 5.5; s.magnet = 3; s.maxHp = 150;
+    var s = G.st; s.dmg = 1; s.spd = 1; s.move = 5.5; s.magnet = 3; s.maxHp = 120;
     G.skills.forEach(function (k) {
       if (k.id === 'might') s.dmg += 0.15 * k.lvl;
       if (k.id === 'haste') s.spd += 0.12 * k.lvl;
@@ -307,7 +307,7 @@ body {
   function spawnOne(type) {
     var def = ENEMY[type], a = Math.random() * Math.PI * 2;
     G.enemies.push({ type: type, def: def, x: G.hero.x + Math.cos(a) * CFG.spawnR, z: G.hero.z + Math.sin(a) * CFG.spawnR,
-      hp: def.hp * (1 + G.t / 60 * 0.25), cd: 0, dead: false, flash: 0, ang: 0, ph: Math.random() * 6 });
+      hp: def.hp * (1 + G.t / 60 * 0.3), cd: 0, dead: false, flash: 0, ang: 0, ph: Math.random() * 6 });
   }
 
   function spawnTick(dt) {
@@ -315,10 +315,10 @@ body {
     if (!G.elite && G.t >= CFG.elite) { G.elite = true; spawnOne('brute'); }
     G.spawnT -= dt;
     if (G.spawnT > 0) return;
-    G.spawnT = 1.6 + (0.4 - 1.6) * prog;
-    var batch = 1 + Math.floor(G.t / 90);
+    G.spawnT = 1.1 + (0.25 - 1.1) * prog;
+    var batch = 1 + Math.floor(G.t / 70);
     for (var i = 0; i < batch && G.enemies.length < CFG.max; i++) {
-      spawnOne(G.t > 60 && Math.random() < 0.25 ? 'skeleton' : 'slime');
+      spawnOne(G.t > 50 && Math.random() < 0.3 ? 'skeleton' : 'slime');
     }
   }
 
@@ -341,7 +341,7 @@ body {
       e.z += (nz * sp + pz * sp * 1.5) * dt;
       if (dist > 0.001) e.ang = Math.atan2(nx, nz);
       e.cd -= dt; e.flash -= dt;
-      if (e.cd <= 0 && dist < e.def.r + 0.5) { h.hp -= e.def.dmg; e.cd = 1.0; if (h.hp <= 0) { h.hp = 0; G.phase = 'fail'; showResult(); } }
+      if (e.cd <= 0 && dist < e.def.r + 0.5) { h.hp -= e.def.dmg; e.cd = 0.9; if (h.hp <= 0) { h.hp = 0; G.phase = 'fail'; showResult(); } }
     }
   }
 
@@ -572,7 +572,7 @@ body {
     h.x += m[0] * G.st.move * dt; h.z += m[1] * G.st.move * dt;
     if (m[0] * m[0] + m[1] * m[1] > 0.01) h.face = Math.atan2(m[0], m[1]);
     heroVis.rotation.y += (h.face - heroVis.rotation.y) * 0.25;
-    h.hp = Math.min(G.st.maxHp, h.hp + 1 * dt);
+    h.hp = Math.min(G.st.maxHp, h.hp + 0.5 * dt);
     spawnTick(dt);
     enemyTick(dt);
     skillTick(dt);

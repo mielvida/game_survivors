@@ -99,7 +99,7 @@ namespace Survivors
     // so it looks infinite and the pattern stays fixed in world space.
     public sealed class GroundFollower : MonoBehaviour
     {
-        const float PlaneSize = 80f;   // metres (a Unity Plane is 10 units at scale 1)
+        const float PlaneSize = 176f;  // metres (a Unity Plane is 10 units at scale 1)
         const float Period = 8f;       // metres per full 2x2 checker repeat
 
         Transform _plane;
